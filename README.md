@@ -1,6 +1,15 @@
 # WeChat MiMoCode Bridge
 
-**通过微信与 MiMoCode 对话，就像和朋友聊天一样**
+<p align="center">
+  <strong>通过微信与 MiMoCode 对话，就像和朋友聊天一样</strong>
+</p>
+
+<p align="center">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-green?style=flat-square" alt="License"></a>
+  <a href="https://www.npmjs.com/package/wechat-mimocode"><img src="https://img.shields.io/npm/v/wechat-mimocode?style=flat-square" alt="npm"></a>
+  <a href="README_en.md"><img src="https://img.shields.io/badge/Lang-English-lightgrey?style=flat-square" alt="English"></a>
+  <img src="https://img.shields.io/badge/Lang-中文-blue?style=flat-square" alt="中文">
+</p>
 
 基于 [wechat-claude-code](https://github.com/Wechat-ggGitHub/wechat-claude-code) 二次开发，将 Claude Code CLI 替换为 MiMoCode CLI。
 

@@ -1,47 +1,59 @@
-# WeChat Claude Code Bridge
+# WeChat MiMoCode Bridge
 
 <p align="center">
-  <strong>Chat with Claude Code in WeChat, just like texting a friend</strong>
+  <strong>Chat with MiMoCode in WeChat, just like texting a friend</strong>
 </p>
 
 <p align="center">
-  <a href="https://github.com/Wechat-ggGitHub/wechat-claude-code/blob/main/LICENSE"><img src="https://img.shields.io/badge/License-MIT-green?style=flat-square" alt="License: MIT"></a>
-  <a href="https://skills.sh/Wechat-ggGitHub/wechat-claude-code"><img src="https://img.shields.io/badge/skills.sh-view_page-blue?style=flat-square" alt="skills.sh"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-green?style=flat-square" alt="License"></a>
+  <a href="https://www.npmjs.com/package/wechat-mimocode"><img src="https://img.shields.io/npm/v/wechat-mimocode?style=flat-square" alt="npm"></a>
+  <img src="https://img.shields.io/badge/Lang-English-blue?style=flat-square" alt="English">
   <a href="README.md"><img src="https://img.shields.io/badge/Lang-中文-lightgrey?style=flat-square" alt="中文"></a>
 </p>
 
-Scan a QR code to bind your WeChat, and a new "friend" appears in your contacts. Send it a message — it gets forwarded to Claude Code running on your computer, and the reply streams back to WeChat in real time. Supports text, images, voice, and files.
+A fork of [wechat-claude-code](https://github.com/Wechat-ggGitHub/wechat-claude-code) that replaces the Claude Code CLI with the MiMoCode CLI.
 
 ---
 
-## Highlights
+## How It Works
 
-| | |
-|---|---|
-| **Scan and go** | No account signup, no server deployment. Scan a QR code and you're done in a minute. All data stays on your machine. |
-| **Clean messages** | Only key info gets pushed — progress, results, key decisions. Tool calls and intermediate noise are filtered out automatically. |
-| **"Typing..." indicator** | WeChat shows a typing indicator while Claude is working, so you always know it's on it. |
-| **Consistent experience** | Mobile and desktop Claude Code behave identically — same orchestration, same output. Not two disconnected AIs. |
-| **Two-way files** | Send images, Word docs, PDFs for Claude to analyze. Files Claude generates get pushed directly to WeChat — no need to go back to your computer. |
-| **Timeout reassurance** | Task taking longer than 5 minutes? You'll get an automatic message letting you know it's still working. |
+```
+WeChat (phone) ←→ ilink Bot API ←→ Node.js daemon ←→ MiMoCode CLI (local)
+```
+
+The daemon long-polls WeChat for new messages, forwards them to the local `mimo` CLI, and streams replies back to WeChat.
+
+## Differences from the Original
+
+| Feature | wechat-claude-code | wechat-mimocode |
+|---------|-------------------|-----------------|
+| CLI command | `claude` | `mimo run` |
+| Output format | `--output-format stream-json` | `--format json` |
+| Session resume | `--resume <sessionId>` | `--session <sessionId>` |
+| Model format | `claude-sonnet-4-6` | `provider/model` (e.g. `xiaomi/mimo-v2.5`) |
+| System prompt | `--append-system-prompt` | Inlined into prompt |
+| Image passing | Temp file path in prompt | `--file` flag |
+| Skill directory | `~/.claude/skills/` | `~/.agents/skills/` + `~/.local/share/mimocode/compose/*/skills/` |
+| Data directory | `~/.wechat-claude-code/` | `~/.wechat-mimocode/` |
+| Daemon | bash script (macOS/Linux) | Cross-platform TypeScript (Windows supported) |
 
 ---
 
 ## Install
 
-**Option 1: skills CLI (recommended)**
+**Option 1: Global install (recommended)**
 
 ```bash
-npx skills add Wechat-ggGitHub/wechat-claude-code
+npm install -g wechat-mimocode
 ```
 
-The first time you trigger the skill, it will automatically clone the source and install dependencies.
+After installation, the `wechat-mimocode` command is available anywhere.
 
-**Option 2: Manual clone**
+**Option 2: From source**
 
 ```bash
-git clone https://github.com/Wechat-ggGitHub/wechat-claude-code.git ~/.claude/skills/wechat-claude-code
-cd ~/.claude/skills/wechat-claude-code && npm install
+git clone https://github.com/Mou-1205/wechat-mimocode.git
+cd wechat-mimocode && npm install && npm install -g .
 ```
 
 ## Quick Start
@@ -49,8 +61,7 @@ cd ~/.claude/skills/wechat-claude-code && npm install
 ### 1. Bind WeChat
 
 ```bash
-cd ~/.claude/skills/wechat-claude-code
-npm run setup
+wechat-mimocode setup
 ```
 
 A QR code will pop up — scan it with WeChat.
@@ -58,10 +69,8 @@ A QR code will pop up — scan it with WeChat.
 ### 2. Start the service
 
 ```bash
-npm run daemon -- start
+wechat-mimocode daemon start
 ```
-
-On macOS, this registers a launchd agent for auto-start on boot and auto-restart on crash.
 
 ### 3. Start chatting
 
@@ -70,73 +79,48 @@ Open WeChat and send a message to your new "friend".
 ### Manage the service
 
 ```bash
-npm run daemon -- status   # Check if running
-npm run daemon -- stop     # Stop the service
-npm run daemon -- restart  # Restart (after code updates)
-npm run daemon -- logs     # View recent logs
+wechat-mimocode daemon status   # Check if running
+wechat-mimocode daemon stop     # Stop the service
+wechat-mimocode daemon restart  # Restart (after updates)
+wechat-mimocode daemon logs     # View recent logs
 ```
 
 ---
 
 ## WeChat Commands
 
-Send these directly in the WeChat chat:
-
 | Command | Description |
 |---------|-------------|
 | `/help` | Show available commands |
-| `/clear` | Clear current session, start fresh |
+| `/clear` | Clear current session |
 | `/stop` | Stop current task |
-| `/model <name>` | Switch Claude model |
-| `/prompt <text>` | Set a system prompt (e.g. "reply in Chinese") |
+| `/model <provider/model>` | Switch model (e.g. `xiaomi/mimo-v2.5`) |
+| `/prompt <text>` | Set a system prompt |
 | `/cwd <path>` | Switch working directory |
 | `/skills` | List installed Skills |
-| `/status` | View current session state |
+| `/status` | View session state |
 | `/history [n]` | View recent chat history |
-| `/compact` | Compact context, start a new CLI session |
-| `/reset` | Full reset including working directory |
-| `/undo [n]` | Remove last N messages from history |
-| `/<skill> [args]` | Trigger any installed Skill |
-
----
-
-## How It Works
-
-```
-WeChat (phone) ←→ ilink Bot API ←→ Node.js daemon ←→ Claude Code CLI (local)
-```
-
-The daemon long-polls WeChat for new messages, forwards them to the local `claude` CLI, and streams replies back to WeChat. Everything runs on your own machine.
-
----
-
-## Roadmap
-
-- **Message queue optimization** — Consecutive messages can produce mixed-up replies. Working on a better queuing strategy. Ideas welcome.
-- **Prevent sleep** — Use macOS `caffeinate` to keep the system awake, so closing the lid doesn't interrupt the service.
-- **Resume desktop session** — Chat on your computer for a while, then continue the same session from WeChat on the go. Same workspace, same context.
+| `/compact` | Compact context |
+| `/reset` | Full reset |
+| `/send <path>` | Send a local file |
 
 ---
 
 ## Prerequisites
 
 - Node.js >= 18
-- macOS or Linux
+- Windows / macOS / Linux
 - A personal WeChat account
-- [Claude Code](https://docs.anthropic.com/en/docs/claude-code) CLI installed and authenticated
-
-> **Note:** Claude Code supports third-party API providers (OpenRouter, AWS Bedrock, etc.) — set `ANTHROPIC_BASE_URL` and `ANTHROPIC_API_KEY` accordingly.
+- [MiMoCode](https://github.com/xiaomi/mimo) CLI installed and authenticated
 
 ## Data Directory
 
-All data is stored in `~/.wechat-claude-code/`:
-
 ```
-~/.wechat-claude-code/
+~/.wechat-mimocode/
 ├── accounts/       # WeChat account credentials
 ├── config.json     # Global config
 ├── sessions/       # Session data
-└── logs/           # Rotating logs (daily, 30-day retention)
+└── logs/           # Logs
 ```
 
 ## License
