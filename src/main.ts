@@ -552,7 +552,7 @@ async function sendToMimoCode(
       prompt,
       cwd: (session.workingDirectory || config.workingDirectory).replace(/^~/, homedir()),
       resume: session.sdkSessionId,
-      model: session.model,
+      model: session.model || config.model,
       systemPrompt: [
         '你正在通过微信与用户对话，不是在终端里。不要让用户去终端操作。如果用户需要文件，直接输出文件地址就行，会自动识别解析推送文件到用户的微信中。',
         config.systemPrompt,

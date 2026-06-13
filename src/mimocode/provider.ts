@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { createInterface } from 'node:readline';
 import { logger } from '../logger.js';
+import { DEFAULT_MODEL } from '../constants.js';
 
 // ---------------------------------------------------------------------------
 // Public types
@@ -92,6 +93,7 @@ export async function mimocodeQuery(options: QueryOptions): Promise<QueryResult>
 
   if (resume) args.push('--session', resume);
   if (model) args.push('-m', model);
+  else args.push('-m', DEFAULT_MODEL);
 
   // Handle images: save to temp files and attach via -f flag
   const tempImagePaths = images?.length ? saveImageTemp(images) : [];
@@ -129,6 +131,7 @@ export async function mimocodeQuery(options: QueryOptions): Promise<QueryResult>
         env: { ...process.env },
         shell: process.platform === 'win32',
         windowsVerbatimArguments: false,
+        windowsHide: true,
       });
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);

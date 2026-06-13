@@ -78,6 +78,7 @@ function daemonStart(): void {
     stdio: ['ignore', 'ignore', 'ignore'],
     shell: false,
     env: { ...process.env },
+    windowsHide: true,
   });
 
   child.unref();

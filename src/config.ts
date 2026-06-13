@@ -1,7 +1,7 @@
 import { readFileSync, writeFileSync, mkdirSync, chmodSync } from "node:fs";
 import { join } from "node:path";
 import { homedir } from "node:os";
-import { DEFAULT_WORKING_DIR } from "./constants.js";
+import { DEFAULT_WORKING_DIR, DEFAULT_MODEL } from "./constants.js";
 
 export interface Config {
   workingDirectory: string;
@@ -14,6 +14,7 @@ const CONFIG_PATH = join(CONFIG_DIR, "config.json");
 
 const DEFAULT_CONFIG: Config = {
   workingDirectory: DEFAULT_WORKING_DIR,
+  model: DEFAULT_MODEL,
 };
 
 export function loadConfig(): Config {
@@ -22,7 +23,7 @@ export function loadConfig(): Config {
     const parsed = JSON.parse(content);
     const config: Config = {
       workingDirectory: parsed.workingDirectory || DEFAULT_CONFIG.workingDirectory,
-      model: parsed.model,
+      model: parsed.model || DEFAULT_CONFIG.model,
       systemPrompt: parsed.systemPrompt,
     };
     mkdirSync(config.workingDirectory, { recursive: true });
