@@ -1,21 +1,21 @@
 {
   "name": "wechat-mimocode",
-  "version": "1.0.0",
-  "description": "Chat with MiMoCode from WeChat - a MiMoCode Skill that bridges personal WeChat to local MiMoCode",
+  "version": "1.0.1",
+  "description": "Chat with MiMoCode from WeChat - bridges personal WeChat to local MiMoCode CLI",
   "type": "module",
   "bin": {
     "wechat-mimocode": "bin/wechat-mimocode.js"
   },
+  "files": [
+    "dist",
+    "bin",
+    "scripts"
+  ],
   "scripts": {
     "build": "tsc",
-    "postinstall": "npm run build",
+    "prepublishOnly": "npm run build",
     "start": "node dist/main.js",
-    "run": "node dist/main.js start",
-    "dev": "tsc --watch",
-    "test": "node --test dist/tests/*.test.js",
-    "setup": "node dist/main.js setup",
-    "daemon": "node dist/main.js daemon",
-    "visualize": "npx tsx src/tools/visualize-logs.ts"
+    "dev": "tsc --watch"
   },
   "dependencies": {
     "qrcode": "^1.5.4",
@@ -27,11 +27,27 @@
     "@types/qrcode-terminal": "^0.12.0",
     "typescript": "^5.7.0"
   },
-  "keywords": ["wechat", "mimocode", "opencode", "claude-code", "bridge", "chat", "skill"],
+  "keywords": [
+    "wechat",
+    "mimocode",
+    "opencode",
+    "claude-code",
+    "bridge",
+    "chat",
+    "skill",
+    "cli"
+  ],
   "author": "MiMo",
   "license": "MIT",
+  "homepage": "https://github.com/Mou-1205/wechat-mimocode",
   "repository": {
     "type": "git",
-    "url": "https://github.com/Wechat-ggGitHub/wechat-claude-code.git"
+    "url": "https://github.com/Mou-1205/wechat-mimocode.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Mou-1205/wechat-mimocode/issues"
+  },
+  "engines": {
+    "node": ">=18"
   }
 }

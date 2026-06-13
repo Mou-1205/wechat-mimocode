@@ -128,6 +128,7 @@ export async function mimocodeQuery(options: QueryOptions): Promise<QueryResult>
         stdio: ['pipe', 'pipe', 'pipe'],
         env: { ...process.env },
         shell: process.platform === 'win32',
+        windowsVerbatimArguments: false,
       });
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -199,7 +200,7 @@ export async function mimocodeQuery(options: QueryOptions): Promise<QueryResult>
           }
           break;
         }
-        case 'tool': {
+        case 'tool_use': {
           // Tool call event — notify via onBlockEnd to flush any buffered text
           if (onBlockEnd) {
             Promise.resolve(onBlockEnd()).catch(() => {});
