@@ -125,4 +125,4 @@ wechat-mimocode daemon logs     # View recent logs
 
 ## License
 
-[MIT](LICENSE)
+Source code is open-sourced under the [MIT License](LICENSE).

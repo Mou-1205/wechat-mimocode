@@ -117,4 +117,4 @@ wechat-mimocode daemon logs     # 查看日志
 
 ## License
 
-[MIT](LICENSE)
+源代码基于 [MIT 许可证](LICENSE) 开源。
