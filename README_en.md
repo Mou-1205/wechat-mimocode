@@ -111,7 +111,7 @@ wechat-mimocode daemon logs     # View recent logs
 - Node.js >= 18
 - Windows / macOS / Linux
 - A personal WeChat account
-- [MiMoCode](https://github.com/xiaomi/mimo) CLI installed and authenticated
+- [MiMoCode](https://github.com/XiaomiMiMo/MiMo-Code) CLI installed and authenticated
 
 ## Data Directory
 

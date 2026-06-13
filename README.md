@@ -103,7 +103,7 @@ wechat-mimocode daemon logs     # 查看日志
 - Node.js >= 18
 - Windows / macOS / Linux
 - 个人微信账号
-- 已安装 [MiMoCode](https://github.com/xiaomi/mimo) CLI 并完成认证
+- 已安装 [MiMoCode](https://github.com/XiaomiMiMo/MiMo-Code) CLI 并完成认证
 
 ## 数据目录
 
