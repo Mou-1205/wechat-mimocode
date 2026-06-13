@@ -28,9 +28,19 @@
 
 ## 快速安装
 
+**方式一：全局安装（推荐）**
+
 ```bash
-git clone <repo-url> wechat-mimocode
-cd wechat-mimocode && npm install
+npm install -g wechat-mimocode
+```
+
+安装后，任何目录下都能直接使用 `wechat-mimocode` 命令。
+
+**方式二：从源码安装**
+
+```bash
+git clone https://github.com/Mou-1205/wechat-mimocode.git
+cd wechat-mimocode && npm install && npm install -g .
 ```
 
 ## 快速开始
@@ -38,7 +48,7 @@ cd wechat-mimocode && npm install
 ### 1. 扫码绑定
 
 ```bash
-npm run setup
+wechat-mimocode setup
 ```
 
 弹出二维码，用微信扫码。
@@ -46,7 +56,7 @@ npm run setup
 ### 2. 启动服务
 
 ```bash
-npm run daemon -- start
+wechat-mimocode daemon start
 ```
 
 ### 3. 开始聊天
@@ -56,10 +66,10 @@ npm run daemon -- start
 ### 管理服务
 
 ```bash
-npm run daemon -- status   # 查看运行状态
-npm run daemon -- stop     # 停止服务
-npm run daemon -- restart  # 重启服务
-npm run daemon -- logs     # 查看日志
+wechat-mimocode daemon status   # 查看运行状态
+wechat-mimocode daemon stop     # 停止服务
+wechat-mimocode daemon restart  # 重启服务
+wechat-mimocode daemon logs     # 查看日志
 ```
 
 ## 微信端命令

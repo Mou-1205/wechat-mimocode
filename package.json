@@ -3,6 +3,9 @@
   "version": "1.0.0",
   "description": "Chat with MiMoCode from WeChat - a MiMoCode Skill that bridges personal WeChat to local MiMoCode",
   "type": "module",
+  "bin": {
+    "wechat-mimocode": "bin/wechat-mimocode.js"
+  },
   "scripts": {
     "build": "tsc",
     "postinstall": "npm run build",

@@ -2,6 +2,6 @@ node_modules/
 dist/
 *.log
 .env
-.wechat-claude-code/
+.wechat-mimocode/
 .claude/
 CLAUDE.md
