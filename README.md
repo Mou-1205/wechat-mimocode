@@ -5,35 +5,24 @@
 </p>
 
 <p align="center">
-  <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-green?style=flat-square" alt="License"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-green?style=flat-square" alt="License: MIT"></a>
   <a href="https://www.npmjs.com/package/wechat-mimocode"><img src="https://img.shields.io/npm/v/wechat-mimocode?style=flat-square" alt="npm"></a>
   <a href="README_en.md"><img src="https://img.shields.io/badge/Lang-English-lightgrey?style=flat-square" alt="English"></a>
   <img src="https://img.shields.io/badge/Lang-中文-blue?style=flat-square" alt="中文">
 </p>
 
-基于 [wechat-claude-code](https://github.com/Wechat-ggGitHub/wechat-claude-code) 二次开发，将 Claude Code CLI 替换为 MiMoCode CLI。
+基于 [wechat-claude-code](https://github.com/Wechat-ggGitHub/wechat-claude-code) 二次开发，将 Claude Code CLI 替换为 [MiMoCode](https://github.com/XiaomiMiMo/MiMo-Code) CLI。扫码绑定微信后，你的微信里会多出一个好友。给它发消息，消息会自动转发给你电脑上运行的 MiMoCode，回复也会实时推送到微信。支持文字、图片、语音和文件收发。
 
-## 工作原理
+## 核心亮点
 
-```
-微信（手机） ←→ ilink Bot API ←→ Node.js 守护进程 ←→ MiMoCode CLI（本地）
-```
-
-守护进程通过长轮询监听微信消息，转发给本地 `mimo` CLI 处理，回复实时流式推送回微信。
-
-## 与原版差异
-
-| 项目 | wechat-claude-code | wechat-mimocode |
-|------|-------------------|-----------------|
-| CLI 命令 | `claude` | `mimo run` |
-| 输出格式 | `--output-format stream-json` | `--format json` |
-| 会话续接 | `--resume <sessionId>` | `--session <sessionId>` |
-| 模型格式 | `claude-sonnet-4-6` | `provider/model` (如 `xiaomi/mimo-v2.5`) |
-| 系统提示 | `--append-system-prompt` | 内联到 prompt 前部 |
-| 图片传递 | 临时文件路径拼接到 prompt | `--file` 参数 |
-| Skill 目录 | `~/.claude/skills/` | `~/.agents/skills/` + `~/.local/share/mimocode/compose/*/skills/` |
-| 数据目录 | `~/.wechat-claude-code/` | `~/.wechat-mimocode/` |
-| Daemon | bash 脚本（macOS/Linux） | 跨平台 TypeScript（支持 Windows） |
+| | |
+|---|---|
+| **扫码即用** | 不用部署服务器。微信扫码绑定后即可使用，账号凭证、会话和日志默认保存在本地。 |
+| **MiMoCode 驱动** | 使用本地 `mimo run` 处理请求，支持 MiMoCode 的模型、工具调用和本地工作区能力。 |
+| **消息不刷屏** | 流式回复会自动分段，只推送可读结果，避免工具调用和中间过程把微信刷屏。 |
+| **“对方正在输入中...”** | MiMoCode 处理任务时，微信顶部会显示输入状态，长任务也能感知它仍在工作。 |
+| **文件双向收发** | 可以把图片、PDF、文档等发给 MiMoCode 分析；生成的文件也可直接推送回微信。 |
+| **跨平台守护进程** | 使用 TypeScript 实现守护进程，支持 Windows、macOS 和 Linux。 |
 
 ## 快速安装
 
@@ -43,13 +32,15 @@
 npm install -g wechat-mimocode
 ```
 
-安装后，任何目录下都能直接使用 `wechat-mimocode` 命令。
+安装后，任何目录下都可以直接使用 `wechat-mimocode` 命令。
 
 **方式二：从源码安装**
 
 ```bash
 git clone https://github.com/Mou-1205/wechat-mimocode.git
-cd wechat-mimocode && npm install && npm install -g .
+cd wechat-mimocode
+npm install
+npm install -g .
 ```
 
 ## 快速开始
@@ -60,7 +51,7 @@ cd wechat-mimocode && npm install && npm install -g .
 wechat-mimocode setup
 ```
 
-弹出二维码，用微信扫码。
+程序会显示或打开二维码，请用微信扫码完成绑定。
 
 ### 2. 启动服务
 
@@ -68,35 +59,63 @@ wechat-mimocode setup
 wechat-mimocode daemon start
 ```
 
+服务启动后会在后台通过长轮询监听微信消息，并转发给本地 MiMoCode CLI。
+
 ### 3. 开始聊天
 
-打开微信，给你新出现的那个"好友"发条消息试试。
+打开微信，给新出现的那个“好友”发消息即可。
 
 ### 管理服务
 
 ```bash
 wechat-mimocode daemon status   # 查看运行状态
 wechat-mimocode daemon stop     # 停止服务
-wechat-mimocode daemon restart  # 重启服务
-wechat-mimocode daemon logs     # 查看日志
+wechat-mimocode daemon restart  # 重启服务（更新后使用）
+wechat-mimocode daemon logs     # 查看最近日志
 ```
 
 ## 微信端命令
 
+直接在微信聊天中发送即可：
+
 | 命令 | 说明 |
 |------|------|
 | `/help` | 显示帮助 |
-| `/clear` | 清除当前会话 |
-| `/stop` | 停止当前任务 |
-| `/model <provider/model>` | 切换模型（如 `xiaomi/mimo-v2.5`） |
-| `/prompt <内容>` | 设置系统提示词 |
-| `/cwd <路径>` | 切换工作目录 |
+| `/clear` | 清除当前会话，开始新对话 |
+| `/stop` | 停止当前任务并清空排队消息 |
+| `/model <provider/model>` | 切换 MiMoCode 模型，如 `xiaomi/mimo-v2.5` |
+| `/prompt <内容>` | 设置系统提示词，如“用中文回答” |
+| `/cwd <路径>` | 查看或切换工作目录 |
 | `/skills` | 查看已安装的 Skill |
-| `/status` | 查看会话状态 |
-| `/history [数量]` | 查看对话记录 |
-| `/compact` | 压缩上下文 |
-| `/reset` | 完全重置 |
+| `/status` | 查看当前会话状态 |
+| `/history [数量]` | 查看最近对话记录 |
+| `/compact` | 压缩上下文，开始新的 CLI 会话 |
+| `/reset` | 完全重置，包括工作目录等设置 |
+| `/undo [数量]` | 撤销最近几条对话 |
 | `/send <路径>` | 发送本地文件 |
+| `/<skill> [参数]` | 触发任意已安装的 Skill |
+
+## 工作原理
+
+```text
+微信（手机） ←→ ilink Bot API ←→ Node.js 守护进程 ←→ MiMoCode CLI（本地）
+```
+
+守护进程通过长轮询监听微信消息，转发给本地 `mimo run` 处理，并将 MiMoCode 的回复实时推送回微信。整个流程运行在你自己的电脑上。
+
+## 与上游差异
+
+| 项目 | wechat-claude-code | wechat-mimocode |
+|------|-------------------|-----------------|
+| CLI 命令 | `claude` | `mimo run` |
+| 输出格式 | `--output-format stream-json` | `--format json` |
+| 会话续接 | `--resume <sessionId>` | `--session <sessionId>` |
+| 模型格式 | `claude-sonnet-4-6` | `provider/model`，如 `xiaomi/mimo-v2.5` |
+| 系统提示 | `--append-system-prompt` | 拼接到 prompt 前部 |
+| 图片传递 | 临时文件路径拼接到 prompt | 临时文件 + `-f` 参数 |
+| Skill 目录 | `~/.claude/skills/` | `~/.agents/skills/` 与 `~/.local/share/mimocode/compose/*/skills/` |
+| 数据目录 | `~/.wechat-claude-code/` | `~/.wechat-mimocode/` |
+| 守护进程 | bash 脚本，偏 macOS/Linux | TypeScript 实现，支持 Windows/macOS/Linux |
 
 ## 前置条件
 
@@ -105,9 +124,13 @@ wechat-mimocode daemon logs     # 查看日志
 - 个人微信账号
 - 已安装 [MiMoCode](https://github.com/XiaomiMiMo/MiMo-Code) CLI 并完成认证
 
+> **提示：** MiMoCode 的模型、提供商和认证方式以 MiMoCode 官方文档为准。你可以先在终端确认 `mimo run` 可正常使用，再启动本项目。
+
 ## 数据目录
 
-```
+所有数据默认存储在 `~/.wechat-mimocode/`：
+
+```text
 ~/.wechat-mimocode/
 ├── accounts/       # 微信账号凭证
 ├── config.json     # 全局配置
@@ -115,6 +138,12 @@ wechat-mimocode daemon logs     # 查看日志
 └── logs/           # 运行日志
 ```
 
+也可以通过环境变量 `WMC_DATA_DIR` 指定数据目录，通过 `WMC_MODEL` 指定默认模型。
+
+## 安全提醒
+
+本项目会把微信消息转发给本地 MiMoCode CLI，并允许 MiMoCode 在指定工作目录内处理任务。请只绑定你信任的微信账号，避免把工作目录设置到敏感路径，并谨慎使用 `/send` 发送本地文件。
+
 ## License
 
-源代码基于 [MIT 许可证](LICENSE) 开源。
+[MIT](LICENSE)
