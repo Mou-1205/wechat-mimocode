@@ -4,6 +4,7 @@ import { spawnSync } from 'node:child_process';
 import { join, basename } from 'node:path';
 import { unlinkSync, writeFileSync, mkdirSync, readFileSync } from 'node:fs';
 import { homedir } from 'node:os';
+import { fileURLToPath } from 'node:url';
 
 import { WeChatApi } from './wechat/api.js';
 import { saveAccount, loadLatestAccount, type AccountData } from './wechat/accounts.js';
@@ -18,6 +19,8 @@ import { loadConfig, saveConfig } from './config.js';
 import { logger } from './logger.js';
 import { DATA_DIR } from './constants.js';
 import { MessageType, type WeixinMessage } from './wechat/types.js';
+
+const __dirname = fileURLToPath(new URL('.', import.meta.url));
 
 // ---------------------------------------------------------------------------
 // Helpers
