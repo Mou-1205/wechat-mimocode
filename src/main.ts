@@ -35,6 +35,7 @@ const AUTO_PUSH_EXTENSIONS = new Set([
   '.txt', '.md',
   '.csv', '.xlsx', '.xls',
   '.mp3', '.wav', '.m4a', '.mp4', '.mov',
+  '.zip', '.rar', '.7z',
 ]);
 
 /** Extract local file paths from MiMoCode's response text. */
