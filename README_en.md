@@ -43,6 +43,12 @@ npm install
 npm install -g .
 ```
 
+### Verify installation
+
+```bash
+wechat-mimocode --version
+```
+
 ## Quick Start
 
 ### 1. Bind WeChat
