@@ -130,7 +130,7 @@ The daemon long-polls WeChat for new messages, forwards them to the local MiMoCo
 - A personal WeChat account
 - [MiMoCode](https://github.com/XiaomiMiMo/MiMo-Code) CLI installed and authenticated
 
-> **Note:** MiMoCode model selection, provider settings, and authentication follow the official MiMoCode documentation. You should first confirm `mimo run` works in your terminal before starting this project.
+> **Note:** MiMoCode model selection, provider settings, and authentication follow the official MiMoCode documentation. You should first confirm MiMoCode CLI works in your terminal before starting this project.
 
 ## Data Directory
 
