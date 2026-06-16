@@ -113,7 +113,7 @@ The daemon long-polls WeChat for new messages, forwards them to the local MiMoCo
 
 | Feature | wechat-claude-code | wechat-mimocode |
 |---------|-------------------|-----------------|
-| CLI command | `claude` | `mimo run` (message via command line args) |
+| CLI command | `claude` | `mimo` |
 | Output format | `--output-format stream-json` | `--format json` |
 | Session resume | `--resume <sessionId>` | `--session <sessionId>` |
 | Model format | `claude-sonnet-4-6` | `provider/model`, e.g. `xiaomi/mimo-v2.5` |

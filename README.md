@@ -120,7 +120,7 @@ wechat-mimocode daemon logs     # 查看最近日志
 
 | 项目 | wechat-claude-code | wechat-mimocode |
 |------|-------------------|-----------------|
-| CLI 命令 | `claude` | `mimo run` (通过命令行参数传递消息) |
+| CLI 命令 | `claude` | `mimo` |
 | 输出格式 | `--output-format stream-json` | `--format json` |
 | 会话续接 | `--resume <sessionId>` | `--session <sessionId>` |
 | 模型格式 | `claude-sonnet-4-6` | `provider/model`，如 `xiaomi/mimo-v2.5` |
