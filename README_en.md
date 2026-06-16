@@ -154,8 +154,8 @@ This project forwards WeChat messages to a local MiMoCode CLI and allows MiMoCod
 
 ### Q: What if I encounter strange issues?
 
-A: If you encounter abnormal behavior or errors:
-1. **Let MiMoCode fix it** - Describe the problem in WeChat chat, MiMoCode will try to diagnose and fix
+A: If you encounter abnormal behavior or errors (like "MiMoCode encountered an error, please try again later"):
+1. **Let MiMoCode fix it** - Describe the problem in CLI terminal, MiMoCode will try to diagnose and fix
 2. **Submit an Issue** - Submit an Issue on GitHub with detailed problem description and reproduction steps
 3. **Community discussion** - Other users may have encountered similar problems, discuss solutions together
 4. **Check logs** - Run `wechat-mimocode daemon logs` for detailed error information
