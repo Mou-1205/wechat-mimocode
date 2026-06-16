@@ -2,7 +2,7 @@ import { createInterface } from 'node:readline';
 import process from 'node:process';
 import { spawnSync } from 'node:child_process';
 import { join, basename } from 'node:path';
-import { unlinkSync, writeFileSync, mkdirSync } from 'node:fs';
+import { unlinkSync, writeFileSync, mkdirSync, readFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 
 import { WeChatApi } from './wechat/api.js';
@@ -703,6 +703,9 @@ if (command === 'setup') {
     console.error('daemon 管理错误:', err);
     process.exit(1);
   });
+} else if (command === '--version' || command === '-v') {
+  const pkg = JSON.parse(readFileSync(join(__dirname, '..', 'package.json'), 'utf-8'));
+  console.log(pkg.version);
 } else {
   // 'start' or no argument
   runDaemon().catch((err) => {

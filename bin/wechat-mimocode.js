@@ -7,12 +7,13 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const mainJs = join(__dirname, '..', 'dist', 'main.js');
 const args = process.argv.slice(2);
 
-// Smart dispatch: if no args or first arg is a subcommand, route appropriately
+// Smart dispatch: if no args or first arg is a flag (but not --version/-v), route to start
 let finalArgs = args;
 
-// Flatten "wechat-mimocode daemon start" -> ["daemon", "start"]
-// npm-style: if first arg looks like a flag, default to "start"
-if (args.length === 0 || args[0].startsWith('-')) {
+// Pass --version/-v directly without modification
+if (args.length > 0 && (args[0] === '--version' || args[0] === '-v')) {
+  finalArgs = args;
+} else if (args.length === 0 || args[0].startsWith('-')) {
   finalArgs = ['start', ...args];
 }
 
