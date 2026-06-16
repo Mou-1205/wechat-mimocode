@@ -1,7 +1,7 @@
 {
   "name": "wechat-mimocode",
-  "version": "1.0.1",
-  "description": "Chat with MiMoCode from WeChat - bridges personal WeChat to local MiMoCode CLI",
+  "version": "1.0.2",
+  "description": "Chat with MiMoCode from WeChat - AI coding assistant bridge for personal WeChat to local MiMoCode CLI",
   "type": "module",
   "bin": {
     "wechat-mimocode": "bin/wechat-mimocode.js"
@@ -35,7 +35,13 @@
     "bridge",
     "chat",
     "skill",
-    "cli"
+    "cli",
+    "ai",
+    "assistant",
+    "coding",
+    "developer-tools",
+    "chatbot",
+    "messaging"
   ],
   "author": "MiMo",
   "license": "MIT",
