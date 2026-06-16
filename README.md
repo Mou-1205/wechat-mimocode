@@ -52,6 +52,31 @@ git clone https://github.com/Mou-1205/wechat-mimocode.git
 cd wechat-mimocode && npm install && npm install -g .
 ```
 
+**方式三：使用 yarn**
+
+```bash
+yarn global add wechat-mimocode
+```
+
+**方式四：使用 pnpm**
+
+```bash
+pnpm add -g wechat-mimocode
+```
+
+### 验证安装
+
+```bash
+wechat-mimocode --version
+```
+
+### 前置条件
+
+- Node.js >= 18
+- Windows / macOS / Linux
+- 个人微信账号
+- 已安装 [MiMoCode](https://github.com/XiaomiMiMo/MiMo-Code) CLI 并完成认证
+
 ## 快速开始
 
 ### 1. 扫码绑定
@@ -97,13 +122,6 @@ wechat-mimocode daemon logs     # 查看日志
 | `/compact` | 压缩上下文 |
 | `/reset` | 完全重置 |
 | `/send <路径>` | 发送本地文件 |
-
-## 前置条件
-
-- Node.js >= 18
-- Windows / macOS / Linux
-- 个人微信账号
-- 已安装 [MiMoCode](https://github.com/XiaomiMiMo/MiMo-Code) CLI 并完成认证
 
 ## 数据目录
 
