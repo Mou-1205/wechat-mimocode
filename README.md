@@ -185,6 +185,14 @@ A: 运行 `npm update -g wechat-mimocode`
 
 A: 所有数据存储在本地，不会上传到任何服务器。微信消息通过官方 API 传输。
 
+### Q: 遇到奇怪的问题怎么办？
+
+A: 如果遇到异常行为或错误：
+1. **让 MiMoCode 自行修复** - 在微信对话中描述问题，MiMoCode 会尝试诊断和修复
+2. **提交 Issue** - 在 GitHub 上提交 Issue，详细描述问题和复现步骤
+3. **社区讨论** - 其他用户可能遇到过类似问题，可以一起讨论解决方案
+4. **查看日志** - 运行 `wechat-mimocode daemon logs` 获取详细错误信息
+
 ## License
 
 [MIT](LICENSE)

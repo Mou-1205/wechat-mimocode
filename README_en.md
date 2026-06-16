@@ -150,6 +150,16 @@ You can also set `WMC_DATA_DIR` to change the data directory, and `WMC_MODEL` to
 
 This project forwards WeChat messages to a local MiMoCode CLI and allows MiMoCode to process tasks within the configured working directory. Bind only a trusted WeChat account, avoid sensitive paths as the working directory, and use `/send` carefully when sharing local files.
 
+## FAQ
+
+### Q: What if I encounter strange issues?
+
+A: If you encounter abnormal behavior or errors:
+1. **Let MiMoCode fix it** - Describe the problem in WeChat chat, MiMoCode will try to diagnose and fix
+2. **Submit an Issue** - Submit an Issue on GitHub with detailed problem description and reproduction steps
+3. **Community discussion** - Other users may have encountered similar problems, discuss solutions together
+4. **Check logs** - Run `wechat-mimocode daemon logs` for detailed error information
+
 ## License
 
 [MIT](LICENSE)
