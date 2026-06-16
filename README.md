@@ -18,7 +18,7 @@
 | | |
 |---|---|
 | **扫码即用** | 不用部署服务器。微信扫码绑定后即可使用，账号凭证、会话和日志默认保存在本地。 |
-| **MiMoCode 驱动** | 使用本地 `mimo run` 处理请求，支持 MiMoCode 的模型、工具调用和本地工作区能力。 |
+| **MiMoCode 驱动** | 使用本地 MiMoCode CLI 处理请求，支持 MiMoCode 的模型、工具调用和本地工作区能力。 |
 | **消息不刷屏** | 流式回复会自动分段，只推送可读结果，避免工具调用和中间过程把微信刷屏。 |
 | **“对方正在输入中...”** | MiMoCode 处理任务时，微信顶部会显示输入状态，长任务也能感知它仍在工作。 |
 | **文件双向收发** | 可以把图片、PDF、文档等发给 MiMoCode 分析；生成的文件也可直接推送回微信。 |
@@ -41,18 +41,6 @@ git clone https://github.com/Mou-1205/wechat-mimocode.git
 cd wechat-mimocode
 npm install
 npm install -g .
-```
-
-**方式三：使用 yarn**
-
-```bash
-yarn global add wechat-mimocode
-```
-
-**方式四：使用 pnpm**
-
-```bash
-pnpm add -g wechat-mimocode
 ```
 
 ### 验证安装
@@ -126,13 +114,13 @@ wechat-mimocode daemon logs     # 查看最近日志
 微信（手机） ←→ ilink Bot API ←→ Node.js 守护进程 ←→ MiMoCode CLI（本地）
 ```
 
-守护进程通过长轮询监听微信消息，转发给本地 `mimo run` 处理，并将 MiMoCode 的回复实时推送回微信。整个流程运行在你自己的电脑上。
+守护进程通过长轮询监听微信消息，转发给本地 MiMoCode CLI 处理，并将 MiMoCode 的回复实时推送回微信。整个流程运行在你自己的电脑上。
 
 ## 与上游差异
 
 | 项目 | wechat-claude-code | wechat-mimocode |
 |------|-------------------|-----------------|
-| CLI 命令 | `claude` | `mimo run` |
+| CLI 命令 | `claude` | `mimo run` (通过 stdin 传递消息) |
 | 输出格式 | `--output-format stream-json` | `--format json` |
 | 会话续接 | `--resume <sessionId>` | `--session <sessionId>` |
 | 模型格式 | `claude-sonnet-4-6` | `provider/model`，如 `xiaomi/mimo-v2.5` |

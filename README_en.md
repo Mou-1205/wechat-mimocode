@@ -18,7 +18,7 @@ A fork of [wechat-claude-code](https://github.com/Wechat-ggGitHub/wechat-claude-
 | | |
 |---|---|
 | **Scan and go** | No server deployment required. Scan a QR code to bind WeChat, and credentials, sessions, and logs are stored locally by default. |
-| **MiMoCode-powered** | Uses local `mimo run` for requests, with MiMoCode model, tool, and workspace support. |
+| **MiMoCode-powered** | Uses local MiMoCode CLI for requests, with MiMoCode model, tool, and workspace support. |
 | **Clean messages** | Streaming replies are split automatically so only readable results are pushed back to WeChat. |
 | **Typing indicator** | WeChat shows a typing indicator while MiMoCode is processing, so you know it is still working. |
 | **Two-way files** | Send images, PDFs, and documents to MiMoCode for analysis; generated files can also be pushed back to WeChat. |
@@ -101,13 +101,13 @@ Send these directly in the WeChat chat:
 WeChat (phone) ←→ ilink Bot API ←→ Node.js daemon ←→ MiMoCode CLI (local)
 ```
 
-The daemon long-polls WeChat for new messages, forwards them to the local `mimo run`, and streams replies back to WeChat. Everything runs on your own computer.
+The daemon long-polls WeChat for new messages, forwards them to the local MiMoCode CLI, and streams replies back to WeChat. Everything runs on your own computer.
 
 ## Differences from the Upstream
 
 | Feature | wechat-claude-code | wechat-mimocode |
 |---------|-------------------|-----------------|
-| CLI command | `claude` | `mimo run` |
+| CLI command | `claude` | `mimo run` (message via stdin) |
 | Output format | `--output-format stream-json` | `--format json` |
 | Session resume | `--resume <sessionId>` | `--session <sessionId>` |
 | Model format | `claude-sonnet-4-6` | `provider/model`, e.g. `xiaomi/mimo-v2.5` |
