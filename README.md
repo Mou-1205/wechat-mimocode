@@ -139,6 +139,20 @@ wechat-mimocode daemon logs     # 查看最近日志
 
 守护进程通过长轮询监听微信消息，转发给本地 MiMoCode CLI 处理，并将 MiMoCode 的回复实时推送回微信。整个流程运行在你自己的电脑上。
 
+## 与上游差异
+
+| 项目 | wechat-claude-code | wechat-mimocode |
+|------|-------------------|-----------------|
+| CLI 命令 | `claude` | `mimo` |
+| 输出格式 | `--output-format stream-json` | `--format json` |
+| 会话续接 | `--resume <sessionId>` | `--session <sessionId>` |
+| 模型格式 | `claude-sonnet-4-6` | `provider/model`，如 `xiaomi/mimo-v2.5` |
+| 系统提示 | `--append-system-prompt` | 拼接到 prompt 前部 |
+| 图片传递 | 临时文件路径拼接到 prompt | 临时文件 + `-f` 参数 |
+| Skill 目录 | `~/.claude/skills/` | `~/.agents/skills/` 与 `~/.local/share/mimocode/compose/*/skills/` |
+| 数据目录 | `~/.wechat-claude-code/` | `~/.wechat-mimocode/` |
+| 守护进程 | bash 脚本，偏 macOS/Linux | TypeScript 实现，支持 Windows/macOS/Linux |
+
 ## 数据目录
 
 所有数据默认存储在 `~/.wechat-mimocode/`：

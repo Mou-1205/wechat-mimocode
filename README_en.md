@@ -141,6 +141,20 @@ WeChat (phone) ←→ ilink Bot API ←→ Node.js daemon ←→ MiMoCode CLI (l
 
 The daemon long-polls WeChat for new messages, forwards them to the local MiMoCode CLI, and streams replies back to WeChat. Everything runs on your own computer.
 
+## Differences from the Upstream
+
+| Feature | wechat-claude-code | wechat-mimocode |
+|---------|-------------------|-----------------|
+| CLI command | `claude` | `mimo` |
+| Output format | `--output-format stream-json` | `--format json` |
+| Session resume | `--resume <sessionId>` | `--session <sessionId>` |
+| Model format | `claude-sonnet-4-6` | `provider/model`, e.g. `xiaomi/mimo-v2.5` |
+| System prompt | `--append-system-prompt` | Prepended to the prompt |
+| Image passing | Temp file path in prompt | Temp file + `-f` flag |
+| Skill directory | `~/.claude/skills/` | `~/.agents/skills/` and `~/.local/share/mimocode/compose/*/skills/` |
+| Data directory | `~/.wechat-claude-code/` | `~/.wechat-mimocode/` |
+| Daemon | bash script, mostly macOS/Linux | TypeScript implementation, supports Windows/macOS/Linux |
+
 ## Data Directory
 
 All data is stored in `~/.wechat-mimocode/` by default:
