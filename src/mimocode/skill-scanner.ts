@@ -1,12 +1,121 @@
 import { readdirSync, readFileSync, existsSync, type Dirent } from 'node:fs';
 import { join } from 'node:path';
 import { homedir } from 'node:os';
+import { execSync } from 'node:child_process';
 import { logger } from '../logger.js';
+
+const translationCache = new Map<string, string>();
 
 export interface SkillInfo {
   name: string;
   description: string;
   path: string;
+}
+
+/**
+ * Translate English text to Chinese using MiMoCode CLI.
+ */
+function translateToChinese(text: string): string {
+  if (!text) return text;
+  
+  const cached = translationCache.get(text);
+  if (cached) return cached;
+  
+  try {
+    const prompt = `Translate the following English text to Chinese, return only the translation without any additional text: ${text}`;
+    const result = execSync(`mimo run --format json`, {
+      input: prompt,
+      encoding: 'utf-8',
+      timeout: 30000,
+      stdio: ['pipe', 'pipe', 'pipe']
+    });
+    
+    // Parse NDJSON output - each line is a separate JSON object
+    const lines = result.split('\n').filter(line => line.trim());
+    let translated = text;
+    for (const line of lines) {
+      try {
+        const obj = JSON.parse(line);
+        if (obj.type === 'text' && obj.part?.text) {
+          translated = obj.part.text.trim();
+          break;
+        }
+      } catch {
+        // Skip unparseable lines
+      }
+    }
+    
+    translationCache.set(text, translated);
+    return translated;
+  } catch (error) {
+    logger.warn(`Translation failed for: ${text.substring(0, 50)}...`);
+    return text;
+  }
+}
+
+/**
+ * Batch translate multiple English texts to Chinese.
+ */
+function batchTranslateToChinese(texts: string[]): string[] {
+  if (texts.length === 0) return texts;
+  
+  const uncachedTexts: string[] = [];
+  const uncachedIndices: number[] = [];
+  const results: string[] = new Array(texts.length);
+  
+  for (let i = 0; i < texts.length; i++) {
+    const cached = translationCache.get(texts[i]);
+    if (cached) {
+      results[i] = cached;
+    } else {
+      uncachedTexts.push(texts[i]);
+      uncachedIndices.push(i);
+    }
+  }
+  
+  if (uncachedTexts.length === 0) return results;
+  
+  try {
+    const combinedText = uncachedTexts.map((t, i) => `${i + 1}. ${t}`).join('\n');
+    const prompt = `Translate the following numbered English texts to Chinese. Return only the translations, one per line, with the same numbering:\n${combinedText}`;
+    const result = execSync(`mimo run --format json`, {
+      input: prompt,
+      encoding: 'utf-8',
+      timeout: 60000,
+      stdio: ['pipe', 'pipe', 'pipe']
+    });
+    
+    // Parse NDJSON output - each line is a separate JSON object
+    let translatedText = '';
+    const lines = result.split('\n').filter(line => line.trim());
+    for (const line of lines) {
+      try {
+        const obj = JSON.parse(line);
+        if (obj.type === 'text' && obj.part?.text) {
+          translatedText = obj.part.text.trim();
+          break;
+        }
+      } catch {
+        // Skip unparseable lines
+      }
+    }
+    
+    const translatedLines = translatedText.split('\n').filter(line => line.trim());
+    
+    for (let i = 0; i < uncachedTexts.length; i++) {
+      const line = translatedLines[i] || '';
+      const translated = line.replace(/^\d+\.\s*/, '').trim() || uncachedTexts[i];
+      translationCache.set(uncachedTexts[i], translated);
+      results[uncachedIndices[i]] = translated;
+    }
+  } catch (error) {
+    logger.warn('Batch translation failed, using original texts');
+    for (let i = 0; i < uncachedTexts.length; i++) {
+      results[uncachedIndices[i]] = uncachedTexts[i];
+    }
+  }
+  
+  return results;
 }
 
 /**
@@ -125,12 +234,15 @@ export function formatSkillList(skills: SkillInfo[]): string {
   if (skills.length === 0) {
     return 'No skills found.';
   }
-
+  
+  const descriptions = skills.map(s => s.description);
+  const translatedDescriptions = batchTranslateToChinese(descriptions);
+  
   const lines = skills.map((s, i) => {
-    const desc = s.description ? ` - ${s.description}` : '';
+    const desc = translatedDescriptions[i] ? ` - ${translatedDescriptions[i]}` : '';
     return `  ${i + 1}. ${s.name}${desc}`;
   });
-
+  
   return `Available skills (${skills.length}):\n${lines.join('\n')}`;
 }
 

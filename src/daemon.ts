@@ -1,11 +1,12 @@
-import { spawn, spawnSync, execSync } from 'node:child_process';
-import { existsSync, mkdirSync, writeFileSync, readFileSync, unlinkSync } from 'node:fs';
-import { join } from 'node:path';
-import { homedir } from 'node:os';
+import { spawn, execSync } from 'node:child_process';
+import { existsSync, mkdirSync, writeFileSync, readFileSync, unlinkSync, openSync, closeSync } from 'node:fs';
+import { join, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { DATA_DIR } from './constants.js';
 import { logger } from './logger.js';
 
-const PROJECT_DIR = process.cwd();
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const PROJECT_DIR = join(__dirname, '..');
 const LOG_DIR = join(DATA_DIR, 'logs');
 const PID_FILE = join(DATA_DIR, 'mimocode-bridge.pid');
 const PLATFORM = process.platform;
@@ -72,13 +73,29 @@ function daemonStart(): void {
 
   console.log('正在启动 wechat-mimocode 守护进程...');
 
+  const stdoutFd = openSync(stdoutPath, 'a');
+  const stderrFd = openSync(stderrPath, 'a');
+
   const child = spawn(nodeBin, [mainJs, 'start'], {
     cwd: PROJECT_DIR,
     detached: true,
-    stdio: ['ignore', 'ignore', 'ignore'],
+    stdio: ['ignore', stdoutFd, stderrFd],
     shell: false,
     env: { ...process.env },
     windowsHide: true,
+  });
+
+  closeSync(stdoutFd);
+  closeSync(stderrFd);
+
+  child.on('error', (err) => {
+    console.error(`启动失败: ${err.message}`);
+  });
+
+  child.on('exit', (code) => {
+    if (code !== 0) {
+      console.error(`守护进程异常退出 (code: ${code})，查看日志: ${stderrPath}`);
+    }
   });
 
   child.unref();
@@ -145,23 +162,32 @@ function daemonLogs(): void {
   const logDir = LOG_DIR;
   if (!existsSync(logDir)) {
     console.log('未找到日志');
+    console.log(`日志目录: ${logDir}`);
     return;
   }
 
+  console.log(`日志目录: ${logDir}\n`);
+
+  let hasAny = false;
   for (const f of ['stdout.log', 'stderr.log']) {
     const filePath = join(logDir, f);
-    if (existsSync(filePath)) {
+    if (!existsSync(filePath)) continue;
+    try {
+      const content = readFileSync(filePath, 'utf-8').trim();
+      if (!content) continue;
+      hasAny = true;
+      const lines = content.split('\n');
+      const tail = lines.slice(-50);
       console.log(`=== ${f} (最后50行) ===`);
-      try {
-        const content = readFileSync(filePath, 'utf-8');
-        const lines = content.split('\n');
-        const tail = lines.slice(-50);
-        console.log(tail.join('\n'));
-      } catch {
-        console.log('(无法读取)');
-      }
+      console.log(tail.join('\n'));
       console.log('');
+    } catch {
+      console.log(`${f}: (无法读取)\n`);
     }
+  }
+
+  if (!hasAny) {
+    console.log('暂无日志');
   }
 }
 

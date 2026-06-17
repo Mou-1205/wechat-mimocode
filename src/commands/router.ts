@@ -1,7 +1,7 @@
 import type { Session } from '../session.js';
 import { findSkill } from '../mimocode/skill-scanner.js';
 import { logger } from '../logger.js';
-import { handleHelp, handleClear, handleCwd, handleModel, handleStatus, handleSkills, handleHistory, handleReset, handleCompact, handleUndo, handleVersion, handlePrompt, handleSend, handleUnknown } from './handlers.js';
+import { handleHelp, handleClear, handleCwd, handleModel, handleStatus, handleSkills, handleHistory, handleReset, handleCompact, handleUndo, handleVersion, handlePrompt, handleSend, handleGoal, handleResume, handleNew, handleUnknown } from './handlers.js';
 
 export interface CommandContext {
   accountId: string;
@@ -17,6 +17,8 @@ export interface CommandResult {
   handled: boolean;
   claudePrompt?: string;
   sendFile?: string; // Absolute path to a file to send to the user
+  resumeSession?: string; // Session ID to resume
+  compactSession?: boolean; // Trigger native /compact via MiMoCode CLI
 }
 
 /**
@@ -68,6 +70,12 @@ export function routeCommand(ctx: CommandContext): CommandResult {
       return handleCompact(ctx);
     case 'send':
       return handleSend(ctx, args);
+    case 'goal':
+      return handleGoal(ctx, args);
+    case 'resume':
+      return handleResume(ctx, args);
+    case 'new':
+      return handleNew(ctx);
     case 'version':
     case 'v':
       return handleVersion();

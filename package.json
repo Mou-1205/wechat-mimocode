@@ -1,6 +1,6 @@
 {
   "name": "wechat-mimocode",
-  "version": "0.1.8",
+  "version": "0.2.0",
   "description": "Chat with MiMoCode from WeChat - AI coding assistant bridge for personal WeChat to local MiMoCode CLI",
   "type": "module",
   "bin": {
@@ -18,6 +18,7 @@
     "dev": "tsc --watch"
   },
   "dependencies": {
+    "better-sqlite3": "^12.11.1",
     "qrcode": "^1.5.4",
     "qrcode-terminal": "^0.12.0"
   },

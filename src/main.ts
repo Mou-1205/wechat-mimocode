@@ -14,7 +14,7 @@ import { createSender } from './wechat/send.js';
 import { downloadImage, extractText, extractFirstImageUrl, extractFirstFileItem, downloadFile } from './wechat/media.js';
 import { createSessionStore, type Session } from './session.js';
 import { routeCommand, type CommandContext, type CommandResult } from './commands/router.js';
-import { mimocodeQuery, type QueryOptions } from './mimocode/provider.js';
+import { mimocodeQuery, mimocodeCompact, type QueryOptions } from './mimocode/provider.js';
 import { loadConfig, saveConfig } from './config.js';
 import { logger } from './logger.js';
 import { DATA_DIR } from './constants.js';
@@ -392,6 +392,26 @@ async function handleMessage(
 
     if (result.handled && result.reply) {
       await sender.sendText(fromUserId, contextToken, result.reply);
+      if (result.resumeSession) {
+        session.sdkSessionId = result.resumeSession;
+        sessionStore.save(account.accountId, session);
+      }
+      return;
+    }
+
+    if (result.handled && result.compactSession) {
+      const cwd = (session.workingDirectory || config.workingDirectory).replace(/^~/, homedir());
+      await sender.sendText(fromUserId, contextToken, '⏳ 正在压缩上下文...');
+      const compactResult = await mimocodeCompact(session.sdkSessionId!, cwd);
+      if (compactResult.error) {
+        logger.error('Compact failed', { error: compactResult.error });
+        await sender.sendText(fromUserId, contextToken, `❌ 压缩失败: ${compactResult.error}`);
+      } else {
+        const reply = compactResult.summary
+          ? `✅ 上下文已压缩\n\n${compactResult.summary}`
+          : '✅ 上下文已压缩';
+        await sender.sendText(fromUserId, contextToken, reply);
+      }
       return;
     }
 

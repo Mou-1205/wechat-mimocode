@@ -11,7 +11,7 @@
   <a href="README.md"><img src="https://img.shields.io/badge/Lang-中文-lightgrey?style=flat-square" alt="中文"></a>
 </p>
 
-A fork of [wechat-claude-code](https://github.com/Wechat-ggGitHub/wechat-claude-code) that replaces the Claude Code CLI with [MiMoCode](https://github.com/XiaomiMiMo/MiMo-Code) CLI. After binding WeChat with a QR code, a new “friend” appears in your contacts. Send it a message, and it is forwarded to MiMoCode running on your computer. Replies stream back to WeChat in real time. Supports text, images, voice, and files.
+A fork of [wechat-claude-code](https://github.com/Wechat-ggGitHub/wechat-claude-code) that replaces the Claude Code CLI with [MiMoCode](https://github.com/XiaomiMiMo/MiMo-Code) CLI. After binding WeChat with a QR code, a new "friend" appears in your contacts. Send it a message, and it is forwarded to MiMoCode running on your computer. Replies stream back to WeChat in real time. Supports text, images, voice, and files.
 
 ## Highlights
 
@@ -19,9 +19,12 @@ A fork of [wechat-claude-code](https://github.com/Wechat-ggGitHub/wechat-claude-
 |---|---|
 | **Scan and go** | No server deployment required. Scan a QR code to bind WeChat, and credentials, sessions, and logs are stored locally by default. |
 | **MiMoCode-powered** | Uses local MiMoCode CLI for requests, with MiMoCode model, tool, and workspace support. |
+| **Native context compression** | Calls MiMoCode CLI's native `/compact` command, session ID remains unchanged, tokens reduced significantly. |
+| **History session restore** | Search by index or keyword, restore previous conversations with one click. |
 | **Clean messages** | Streaming replies are split automatically so only readable results are pushed back to WeChat. |
 | **Typing indicator** | WeChat shows a typing indicator while MiMoCode is processing, so you know it is still working. |
 | **Two-way files** | Send images, PDFs, and documents to MiMoCode for analysis; generated files can also be pushed back to WeChat. |
+| **Skills auto-translation** | `/skills full` shows installed Skills with descriptions automatically translated to Chinese. |
 | **Cross-platform daemon** | The daemon is implemented in TypeScript and supports Windows, macOS, and Linux. |
 
 ## Install
@@ -49,6 +52,15 @@ npm install -g .
 wechat-mimocode --version
 ```
 
+## Prerequisites
+
+- Node.js >= 18
+- Windows / macOS / Linux
+- A personal WeChat account
+- [MiMoCode](https://github.com/XiaomiMiMo/MiMo-Code) CLI installed and authenticated
+
+> **Note:** MiMoCode model selection, provider settings, and authentication follow the official MiMoCode documentation. You should first confirm MiMoCode CLI works in your terminal before starting this project.
+
 ## Quick Start
 
 ### 1. Bind WeChat
@@ -69,7 +81,7 @@ The daemon will long-poll WeChat messages in the background and forward them to 
 
 ### 3. Start chatting
 
-Open WeChat and send a message to your new “friend”.
+Open WeChat and send a message to your new "friend".
 
 ### Manage the service
 
@@ -84,20 +96,40 @@ wechat-mimocode daemon logs     # View recent logs
 
 Send these directly in the WeChat chat:
 
+### Session Management
+
 | Command | Description |
 |---------|-------------|
 | `/help` | Show available commands |
+| `/new` | Start a new topic, show current config |
 | `/clear` | Clear current session and start fresh |
-| `/stop` | Stop the current task and clear queued messages |
-| `/model <provider/model>` | Switch MiMoCode model, e.g. `xiaomi/mimo-v2.5` |
-| `/prompt <text>` | Set a system prompt, e.g. “reply in Chinese” |
-| `/cwd <path>` | View or switch the working directory |
-| `/skills` | List installed Skills |
-| `/status` | View current session state |
-| `/history [n]` | View recent chat history |
-| `/compact` | Compact context and start a new CLI session |
 | `/reset` | Full reset, including the working directory |
-| `/undo [n]` | Remove the last N messages from history |
+| `/stop` | Stop the current task and clear queued messages |
+| `/compact` | Compact context (calls MiMoCode native compression) |
+| `/resume` | List last 15 historical sessions |
+| `/resume <number>` | Restore session by index |
+| `/resume <keyword>` | Search and restore session |
+| `/goal <target>` | Set a persistent goal |
+| `/goal clear` | Clear the goal |
+| `/history [n]` | View recent chat history (default 20) |
+| `/undo [n]` | Remove the last N messages (default 1) |
+
+### Configuration
+
+| Command | Description |
+|---------|-------------|
+| `/model <provider/model>` | Switch MiMoCode model, e.g. `xiaomi/mimo-v2.5` |
+| `/prompt <text>` | Set a system prompt, e.g. "reply in Chinese" |
+| `/prompt clear` | Clear the system prompt |
+| `/cwd <path>` | View or switch the working directory |
+
+### Tools
+
+| Command | Description |
+|---------|-------------|
+| `/skills` | List installed Skills |
+| `/skills full` | List installed Skills (Chinese descriptions) |
+| `/status` | View current session state |
 | `/send <path>` | Send a local file |
 | `/<skill> [args]` | Trigger any installed Skill |
 
@@ -108,29 +140,6 @@ WeChat (phone) ←→ ilink Bot API ←→ Node.js daemon ←→ MiMoCode CLI (l
 ```
 
 The daemon long-polls WeChat for new messages, forwards them to the local MiMoCode CLI, and streams replies back to WeChat. Everything runs on your own computer.
-
-## Differences from the Upstream
-
-| Feature | wechat-claude-code | wechat-mimocode |
-|---------|-------------------|-----------------|
-| CLI command | `claude` | `mimo` |
-| Output format | `--output-format stream-json` | `--format json` |
-| Session resume | `--resume <sessionId>` | `--session <sessionId>` |
-| Model format | `claude-sonnet-4-6` | `provider/model`, e.g. `xiaomi/mimo-v2.5` |
-| System prompt | `--append-system-prompt` | Prepended to the prompt |
-| Image passing | Temp file path in prompt | Temp file + `-f` flag |
-| Skill directory | `~/.claude/skills/` | `~/.agents/skills/` and `~/.local/share/mimocode/compose/*/skills/` |
-| Data directory | `~/.wechat-claude-code/` | `~/.wechat-mimocode/` |
-| Daemon | bash script, mostly macOS/Linux | TypeScript implementation, supports Windows/macOS/Linux |
-
-## Prerequisites
-
-- Node.js >= 18
-- Windows / macOS / Linux
-- A personal WeChat account
-- [MiMoCode](https://github.com/XiaomiMiMo/MiMo-Code) CLI installed and authenticated
-
-> **Note:** MiMoCode model selection, provider settings, and authentication follow the official MiMoCode documentation. You should first confirm MiMoCode CLI works in your terminal before starting this project.
 
 ## Data Directory
 
@@ -159,6 +168,13 @@ A: If you encounter abnormal behavior or errors (like "MiMoCode encountered an e
 2. **Submit an Issue** - Submit an Issue on GitHub with detailed problem description and reproduction steps
 3. **Community discussion** - Other users may have encountered similar problems, discuss solutions together
 4. **Check logs** - Run `wechat-mimocode daemon logs` for detailed error information
+
+## Acknowledgements
+
+This project is based on the following projects:
+
+- [wechat-claude-code](https://github.com/Wechat-ggGitHub/wechat-claude-code) - Original project
+- [wechat-claude-code-enhanced](https://github.com/UnknownJackMe/wechat-claude-code-enhanced) - Enhanced version, inspired many features
 
 ## License
 

@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { createInterface } from 'node:readline';
 import { logger } from '../logger.js';
-import { DEFAULT_MODEL } from '../constants.js';
+import { DEFAULT_MODEL, WECHAT_SESSION_PREFIX } from '../constants.js';
 
 // ---------------------------------------------------------------------------
 // Public types
@@ -60,6 +60,116 @@ function cleanupTempFiles(paths: string[]): void {
 }
 
 // ---------------------------------------------------------------------------
+// Compact (native /compact via CLI)
+// ---------------------------------------------------------------------------
+
+export interface CompactResult {
+  summary: string;
+  sessionId: string;
+  error?: string;
+}
+
+export async function mimocodeCompact(sessionId: string, cwd: string): Promise<CompactResult> {
+  const args: string[] = [
+    'run',
+    '--format', 'json',
+    '--session', sessionId,
+    '--dangerously-skip-permissions',
+    '--dir', cwd,
+  ];
+
+  const QUERY_TIMEOUT_MS = 5 * 60 * 1000;
+
+  return new Promise<CompactResult>((resolve) => {
+    let settled = false;
+    let child: ChildProcess | undefined;
+    const textParts: string[] = [];
+    let resultSessionId = '';
+    let errorMessage: string | undefined;
+
+    const finish = (result: CompactResult) => {
+      if (settled) return;
+      settled = true;
+      resolve(result);
+    };
+
+    try {
+      child = spawn('mimo', args, {
+        cwd,
+        stdio: ['pipe', 'pipe', 'pipe'],
+        env: { ...process.env },
+        shell: process.platform === 'win32',
+        windowsVerbatimArguments: false,
+        windowsHide: true,
+      });
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      finish({ summary: '', sessionId, error: `Failed to spawn mimo: ${msg}` });
+      return;
+    }
+
+    child.stdin!.write('/compact');
+    child.stdin!.end();
+
+    const timeoutId = setTimeout(() => {
+      logger.warn('MiMoCode compact timed out, killing process');
+      child!.kill('SIGTERM');
+      finish({ summary: '', sessionId, error: 'Compact timed out after 5 minutes' });
+    }, QUERY_TIMEOUT_MS);
+
+    const stderrParts: string[] = [];
+    child.stderr!.setEncoding('utf8');
+    child.stderr!.on('data', (chunk: string) => {
+      stderrParts.push(chunk);
+    });
+
+    const rl = createInterface({ input: child.stdout! });
+    rl.on('line', (line: string) => {
+      if (!line.trim()) return;
+      let obj: any;
+      try {
+        obj = JSON.parse(line);
+      } catch {
+        return;
+      }
+
+      if (obj.sessionID && !resultSessionId) {
+        resultSessionId = obj.sessionID;
+      }
+
+      switch (obj.type) {
+        case 'text': {
+          const text: string = obj.part?.text ?? '';
+          if (text) textParts.push(text);
+          break;
+        }
+        case 'error': {
+          errorMessage = obj.error?.data?.message || obj.error?.message || obj.error?.name || 'Unknown error';
+          break;
+        }
+        default:
+          break;
+      }
+    });
+
+    child.on('close', (code: number | null) => {
+      clearTimeout(timeoutId);
+      if (code !== 0 && code !== null && !textParts.length && !errorMessage) {
+        const stderr = stderrParts.join('').trim();
+        errorMessage = stderr || `mimo exited with code ${code}`;
+      }
+      const summary = textParts.join('\n').trim();
+      finish({ summary, sessionId: resultSessionId || sessionId, error: errorMessage });
+    });
+
+    child.on('error', (err: Error) => {
+      clearTimeout(timeoutId);
+      finish({ summary: '', sessionId, error: `Failed to spawn mimo: ${err.message}` });
+    });
+  });
+}
+
+// ---------------------------------------------------------------------------
 // Core function
 // ---------------------------------------------------------------------------
 
@@ -94,6 +204,9 @@ export async function mimocodeQuery(options: QueryOptions): Promise<QueryResult>
   if (resume) args.push('--session', resume);
   if (model) args.push('-m', model);
   else args.push('-m', DEFAULT_MODEL);
+
+  // Tag new sessions with [WeChat] prefix so /resume can filter them
+  if (!resume) args.push('--title', `${WECHAT_SESSION_PREFIX}${Date.now()}`);
 
   // Handle images: save to temp files and attach via -f flag
   const tempImagePaths = images?.length ? saveImageTemp(images) : [];
