@@ -11,6 +11,42 @@ const LOG_DIR = join(DATA_DIR, 'logs');
 const PID_FILE = join(DATA_DIR, 'mimocode-bridge.pid');
 const PLATFORM = process.platform;
 
+function getCurrentVersion(): string {
+  try {
+    const pkg = JSON.parse(readFileSync(join(PROJECT_DIR, 'package.json'), 'utf-8'));
+    return pkg.version || '0.0.0';
+  } catch {
+    return '0.0.0';
+  }
+}
+
+function getLatestVersion(): string | null {
+  try {
+    const output = execSync('npm view wechat-mimocode version', {
+      encoding: 'utf-8',
+      timeout: 10000,
+      stdio: ['pipe', 'pipe', 'pipe'],
+    });
+    return output.trim();
+  } catch {
+    return null;
+  }
+}
+
+function checkVersion(): void {
+  const current = getCurrentVersion();
+  const latest = getLatestVersion();
+  
+  if (!latest) return;
+  
+  if (current !== latest) {
+    console.log(`\n⚠️  版本更新提示:`);
+    console.log(`   当前版本: ${current}`);
+    console.log(`   最新版本: ${latest}`);
+    console.log(`   请运行: npm install -g wechat-mimocode@latest\n`);
+  }
+}
+
 function ensureLogDir(): void {
   mkdirSync(LOG_DIR, { recursive: true });
 }
@@ -58,6 +94,7 @@ function getMainJs(): string {
 
 function daemonStart(): void {
   ensureLogDir();
+  checkVersion();
 
   const existingPid = readPid();
   if (existingPid && isProcessRunning(existingPid)) {
