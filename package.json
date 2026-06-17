@@ -1,6 +1,6 @@
 {
   "name": "wechat-mimocode",
-  "version": "0.2.0",
+  "version": "2.0.0",
   "description": "Chat with MiMoCode from WeChat - AI coding assistant bridge for personal WeChat to local MiMoCode CLI",
   "type": "module",
   "bin": {
