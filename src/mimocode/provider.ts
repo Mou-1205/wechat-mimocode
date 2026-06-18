@@ -4,7 +4,8 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { createInterface } from 'node:readline';
 import { logger } from '../logger.js';
-import { DEFAULT_MODEL, WECHAT_SESSION_PREFIX } from '../constants.js';
+import { DEFAULT_MODEL } from '../constants.js';
+import { tagSessionAsWeChat } from './session-scanner.js';
 
 // ---------------------------------------------------------------------------
 // Public types
@@ -204,7 +205,7 @@ export async function mimocodeQuery(options: QueryOptions): Promise<QueryResult>
   else args.push('-m', DEFAULT_MODEL);
 
   // Tag new sessions with [WeChat] prefix so /resume can filter them
-  if (!resume) args.push('--title', `${WECHAT_SESSION_PREFIX}${Date.now()}`);
+  // Don't pass --title — let MiMoCode auto-generate meaningful titles from conversation content
 
   // Handle images: save to temp files and attach via -f flag
   const tempImagePaths = images?.length ? await saveImageTemp(images) : [];
@@ -331,7 +332,6 @@ export async function mimocodeQuery(options: QueryOptions): Promise<QueryResult>
           break;
         }
         case 'step_finish': {
-          // Step finished — check for error reason
           const reason = obj.part?.reason;
           if (reason === 'error') {
             errorMessage = obj.part?.error || 'Step finished with error';
@@ -365,6 +365,8 @@ export async function mimocodeQuery(options: QueryOptions): Promise<QueryResult>
         textLength: fullText.length,
         hasError: !!errorMessage,
       });
+
+      if (sessionId) tagSessionAsWeChat(sessionId);
 
       finish({
         text: fullText,

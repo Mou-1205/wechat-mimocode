@@ -10,5 +10,3 @@ export const DEFAULT_WORKING_DIR = existsSync(documentsDir) ? join(documentsDir,
 export const DEFAULT_MODEL = process.env.WMC_MODEL || 'xiaomi/mimo-v2.5';
 
 export const CDN_BASE_URL = 'https://novac2c.cdn.weixin.qq.com/c2c';
-
-export const WECHAT_SESSION_PREFIX = '[WeChat] ';
