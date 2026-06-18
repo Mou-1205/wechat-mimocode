@@ -1,15 +1,15 @@
 {
   "name": "wechat-mimocode",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "description": "Chat with MiMoCode from WeChat - AI coding assistant bridge for personal WeChat to local MiMoCode CLI",
   "type": "module",
   "bin": {
     "wechat-mimocode": "bin/wechat-mimocode.js"
   },
+  "types": "dist/main.d.ts",
   "files": [
     "dist",
-    "bin",
-    "scripts"
+    "bin"
   ],
   "scripts": {
     "build": "tsc",

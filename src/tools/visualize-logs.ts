@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Log Visualizer for wechat-claude-code
+ * Log Visualizer for wechat-mimocode
  *
  * Generates a self-contained HTML page that compares Claude CLI's original
  * output with what the user actually saw in WeChat.
@@ -14,7 +14,7 @@ import { join } from 'node:path';
 import { homedir } from 'node:os';
 import { execSync } from 'node:child_process';
 
-const DATA_DIR = process.env.WCC_DATA_DIR || join(homedir(), '.wechat-claude-code');
+const DATA_DIR = process.env.WMC_DATA_DIR || join(homedir(), '.wechat-mimocode');
 
 // ─── Keepalive messages (must match main.ts SILENCE_MESSAGES) ───
 const SILENCE_MESSAGES = new Set([

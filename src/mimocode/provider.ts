@@ -1,5 +1,5 @@
 import { spawn, type ChildProcess } from 'node:child_process';
-import { writeFileSync, unlinkSync, mkdirSync } from 'node:fs';
+import { mkdir, writeFile, unlink } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { createInterface } from 'node:readline';
@@ -40,23 +40,21 @@ export interface QueryResult {
 
 const TEMP_DIR = join(tmpdir(), 'wechat-mimocode');
 
-function saveImageTemp(images: NonNullable<QueryOptions['images']>): string[] {
-  mkdirSync(TEMP_DIR, { recursive: true });
+async function saveImageTemp(images: NonNullable<QueryOptions['images']>): Promise<string[]> {
+  await mkdir(TEMP_DIR, { recursive: true });
   const paths: string[] = [];
   for (const img of images) {
     const ext = img.source.media_type.split('/')[1] || 'png';
     const fileName = `img-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
     const filePath = join(TEMP_DIR, fileName);
-    writeFileSync(filePath, Buffer.from(img.source.data, 'base64'));
+    await writeFile(filePath, Buffer.from(img.source.data, 'base64'));
     paths.push(filePath);
   }
   return paths;
 }
 
-function cleanupTempFiles(paths: string[]): void {
-  for (const p of paths) {
-    try { unlinkSync(p); } catch { /* ignore */ }
-  }
+async function cleanupTempFiles(paths: string[]): Promise<void> {
+  await Promise.all(paths.map(p => unlink(p).catch(() => {})));
 }
 
 // ---------------------------------------------------------------------------
@@ -209,7 +207,7 @@ export async function mimocodeQuery(options: QueryOptions): Promise<QueryResult>
   if (!resume) args.push('--title', `${WECHAT_SESSION_PREFIX}${Date.now()}`);
 
   // Handle images: save to temp files and attach via -f flag
-  const tempImagePaths = images?.length ? saveImageTemp(images) : [];
+  const tempImagePaths = images?.length ? await saveImageTemp(images) : [];
   for (const imgPath of tempImagePaths) {
     args.push('-f', imgPath);
   }
@@ -233,7 +231,7 @@ export async function mimocodeQuery(options: QueryOptions): Promise<QueryResult>
     const finish = (result: QueryResult) => {
       if (settled) return;
       settled = true;
-      cleanupTempFiles(tempImagePaths);
+      cleanupTempFiles(tempImagePaths).catch(() => {});
       resolve(result);
     };
 

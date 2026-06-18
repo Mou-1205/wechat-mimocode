@@ -10,7 +10,7 @@ export interface SessionInfo {
   messageCount: number;
 }
 
-const DB_PATH = join(homedir(), '.local', 'share', 'mimocode', 'mimocode.db');
+const DB_PATH = join(process.env.XDG_DATA_HOME || join(homedir(), '.local', 'share'), 'mimocode', 'mimocode.db');
 
 export function scanSessions(limit: number = 20): SessionInfo[] {
   const db = new Database(DB_PATH, { readonly: true });

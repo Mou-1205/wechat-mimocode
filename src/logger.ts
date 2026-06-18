@@ -2,7 +2,7 @@ import { mkdirSync, appendFileSync, readdirSync, unlinkSync } from "node:fs";
 import { join } from "node:path";
 import { homedir } from "node:os";
 
-const LOG_DIR = join(homedir(), ".wechat-mimocode", "logs");
+const LOG_DIR = join(process.env.XDG_CACHE_HOME || join(homedir(), ".cache"), "wechat-mimocode", "logs");
 const MAX_LOG_FILES = 30; // Keep at most 30 days of logs
 
 /** Clean up old log files beyond MAX_LOG_FILES retention. */
@@ -50,15 +50,23 @@ function ensureLogDir(): void {
 }
 
 function getLogFilePath(): string {
-  const now = new Date(Date.now() + 8 * 60 * 60 * 1000);
+  const now = new Date();
   const date = now.toISOString().slice(0, 10); // YYYY-MM-DD
   return join(LOG_DIR, `bridge-${date}.log`);
 }
 
+function localTimestamp(): string {
+  const d = new Date();
+  const offset = -d.getTimezoneOffset();
+  const sign = offset >= 0 ? '+' : '-';
+  const hh = String(Math.floor(Math.abs(offset) / 60)).padStart(2, '0');
+  const mm = String(Math.abs(offset) % 60).padStart(2, '0');
+  return d.toISOString().replace('Z', `${sign}${hh}:${mm}`);
+}
+
 function writeLogLine(level: string, message: string, data?: unknown): void {
   ensureLogDir();
-  const ts = new Date(Date.now() + 8 * 60 * 60 * 1000).toISOString();
-  const timestamp = ts.replace('Z', '+08:00');
+  const timestamp = localTimestamp();
   const parts = [timestamp, level, message];
   if (data !== undefined) {
     parts.push(redact(data));

@@ -201,7 +201,7 @@ export function scanAllSkills(): SkillInfo[] {
   }
 
   // 2. ~/.local/share/mimocode/compose/*/skills/*/
-  const mimocodeDataDir = join(home, '.local', 'share', 'mimocode', 'compose');
+  const mimocodeDataDir = join(process.env.XDG_DATA_HOME || join(home, '.local', 'share'), 'mimocode', 'compose');
   if (existsSync(mimocodeDataDir)) {
     let composeEntries: Dirent[];
     try {
