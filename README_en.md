@@ -13,10 +13,12 @@
 
 A fork of [wechat-claude-code](https://github.com/Wechat-ggGitHub/wechat-claude-code) that replaces the Claude Code CLI with [MiMoCode](https://github.com/XiaomiMiMo/MiMo-Code) CLI. After binding WeChat with a QR code, a new "friend" appears in your contacts. Send it a message, and it is forwarded to MiMoCode running on your computer. Replies stream back to WeChat in real time. Supports text, images, voice, and files.
 
-## Highlights
+## Core Advantages
 
 | | |
 |---|---|
+| **Native WeChat Integration** | Connects through WeChat ClawBot (iLink Bot) official API, **no risk of account ban**. |
+| **No Third-party Services** | No external servers required. All data processed locally, secure and controllable. |
 | **Scan and go** | No server deployment required. Scan a QR code to bind WeChat, and credentials, sessions, and logs are stored locally by default. |
 | **MiMoCode-powered** | Uses local MiMoCode CLI for requests, with MiMoCode model, tool, and workspace support. |
 | **Native context compression** | Calls MiMoCode CLI's native `/compact` command, session ID remains unchanged, tokens reduced significantly. |
@@ -118,7 +120,7 @@ Send these directly in the WeChat chat:
 
 | Command | Description |
 |---------|-------------|
-| `/model <provider/model>` | Switch MiMoCode model, e.g. `xiaomi/mimo-v2.5` |
+| `/model <provider/model>` | Switch MiMoCode model, e.g. `mimo/mimo-auto` |
 | `/prompt <text>` | Set a system prompt, e.g. "reply in Chinese" |
 | `/prompt clear` | Clear the system prompt |
 | `/cwd <path>` | View or switch the working directory |
@@ -136,8 +138,17 @@ Send these directly in the WeChat chat:
 ## How It Works
 
 ```text
-WeChat (phone) ←→ ilink Bot API ←→ Node.js daemon ←→ MiMoCode CLI (local)
+WeChat (phone) ←→ WeChat ClawBot API ←→ Node.js daemon ←→ MiMoCode CLI (local)
 ```
+
+### What is ClawBot?
+
+ClawBot is WeChat's official Bot interface (iLink Bot) that allows developers to create WeChat bots through official APIs. Unlike third-party reverse-engineered protocols, ClawBot is officially supported by WeChat:
+
+- **Official Authorization**: Recognized and supported by WeChat
+- **Stable & Reliable**: Won't break when WeChat updates
+- **No Ban Risk**: Uses official APIs, doesn't violate WeChat's terms of service
+- **Full Functionality**: Supports text, images, files, voice, and other message types
 
 The daemon long-polls WeChat for new messages, forwards them to the local MiMoCode CLI, and streams replies back to WeChat. Everything runs on your own computer.
 
@@ -148,7 +159,7 @@ The daemon long-polls WeChat for new messages, forwards them to the local MiMoCo
 | CLI command | `claude` | `mimo` |
 | Output format | `--output-format stream-json` | `--format json` |
 | Session resume | `--resume <sessionId>` | `--session <sessionId>` |
-| Model format | `claude-sonnet-4-6` | `provider/model`, e.g. `xiaomi/mimo-v2.5` |
+| Model format | `claude-sonnet-4-6` | `provider/model`, e.g. `mimo/mimo-auto` |
 | System prompt | `--append-system-prompt` | Prepended to the prompt |
 | Image passing | Temp file path in prompt | Temp file + `-f` flag |
 | Skill directory | `~/.claude/skills/` | `~/.agents/skills/` and `~/.local/share/mimocode/compose/*/skills/` |
@@ -171,9 +182,45 @@ You can also set `WMC_DATA_DIR` to change the data directory, and `WMC_MODEL` to
 
 ## Safety Notes
 
+This project connects to WeChat through the official ClawBot API, **with no risk of account ban**. All message transmissions use WeChat's official encrypted channels, ensuring security and reliability.
+
 This project forwards WeChat messages to a local MiMoCode CLI and allows MiMoCode to process tasks within the configured working directory. Bind only a trusted WeChat account, avoid sensitive paths as the working directory, and use `/send` carefully when sharing local files.
 
 ## FAQ
+
+### Q: What if command not found after installation?
+
+A: Make sure the npm global installation path is in your system PATH. Run `npm config get prefix` to check.
+
+### Q: What if no friend appears after scanning QR code?
+
+A: Please ensure:
+1. Use a personal WeChat account (enterprise WeChat not supported)
+2. WeChat version is up to date
+3. Wait a few minutes, sometimes sync takes time
+
+### Q: What if message sending fails?
+
+A: Check:
+1. MiMoCode CLI is installed and authenticated
+2. Network connection is working
+3. Check logs: `wechat-mimocode daemon logs`
+
+### Q: How to switch working directory?
+
+A: Send `/cwd <path>` in WeChat chat.
+
+### Q: Does it support group chat?
+
+A: Currently only personal chat is supported, group chat is not yet available.
+
+### Q: How to update to latest version?
+
+A: Run `npm update -g wechat-mimocode`
+
+### Q: Is my data safe?
+
+A: All data is stored locally, nothing is uploaded to any server. WeChat messages are transmitted through official APIs.
 
 ### Q: What if I encounter strange issues?
 

@@ -13,10 +13,12 @@
 
 基于 [wechat-claude-code](https://github.com/Wechat-ggGitHub/wechat-claude-code) 二次开发，将 Claude Code CLI 替换为 [MiMoCode](https://github.com/XiaomiMiMo/MiMo-Code) CLI。扫码绑定微信后，你的微信里会多出一个好友。给它发消息，消息会自动转发给你电脑上运行的 MiMoCode，回复也会实时推送到微信。支持文字、图片、语音和文件收发。
 
-## 核心亮点
+## 核心优势
 
 | | |
 |---|---|
+| **原生接入微信** | 通过微信官方 ClawBot（iLink Bot）接口实现，使用微信官方 API，**无封号风险**。 |
+| **无需第三方服务** | 不依赖任何第三方中转服务器，所有数据在本地处理，安全可控。 |
 | **扫码即用** | 不用部署服务器。微信扫码绑定后即可使用，账号凭证、会话和日志默认保存在本地。 |
 | **MiMoCode 驱动** | 使用本地 MiMoCode CLI 处理请求，支持 MiMoCode 的模型、工具调用和本地工作区能力。 |
 | **原生上下文压缩** | 调用 MiMoCode CLI 原生 `/compact` 命令，session ID 保持不变，token 大幅减少。 |
@@ -116,7 +118,7 @@ wechat-mimocode daemon logs     # 查看最近日志
 
 | 命令 | 说明 |
 |------|------|
-| `/model <provider/model>` | 切换 MiMoCode 模型，如 `xiaomi/mimo-v2.5` |
+| `/model <provider/model>` | 切换 MiMoCode 模型，如 `mimo/mimo-auto` |
 | `/prompt <内容>` | 设置系统提示词，如"用中文回答" |
 | `/prompt clear` | 清除系统提示词 |
 | `/cwd <路径>` | 查看或切换工作目录 |
@@ -134,8 +136,17 @@ wechat-mimocode daemon logs     # 查看最近日志
 ## 工作原理
 
 ```text
-微信（手机） ←→ ilink Bot API ←→ Node.js 守护进程 ←→ MiMoCode CLI（本地）
+微信（手机） ←→ 微信 ClawBot API ←→ Node.js 守护进程 ←→ MiMoCode CLI（本地）
 ```
+
+### 什么是 ClawBot？
+
+ClawBot 是微信官方提供的 Bot 接口（iLink Bot），允许开发者通过官方 API 创建微信机器人。与第三方逆向协议不同，ClawBot 是微信官方支持的方式，具有以下特点：
+
+- **官方授权**：微信官方认可的 Bot 接入方式
+- **稳定可靠**：不会因微信更新而失效
+- **无封号风险**：使用官方 API，不违反微信使用条款
+- **功能完整**：支持文字、图片、文件、语音等多种消息类型
 
 守护进程通过长轮询监听微信消息，转发给本地 MiMoCode CLI 处理，并将 MiMoCode 的回复实时推送回微信。整个流程运行在你自己的电脑上。
 
@@ -146,7 +157,7 @@ wechat-mimocode daemon logs     # 查看最近日志
 | CLI 命令 | `claude` | `mimo` |
 | 输出格式 | `--output-format stream-json` | `--format json` |
 | 会话续接 | `--resume <sessionId>` | `--session <sessionId>` |
-| 模型格式 | `claude-sonnet-4-6` | `provider/model`，如 `xiaomi/mimo-v2.5` |
+| 模型格式 | `claude-sonnet-4-6` | `provider/model`，如 `mimo/mimo-auto` |
 | 系统提示 | `--append-system-prompt` | 拼接到 prompt 前部 |
 | 图片传递 | 临时文件路径拼接到 prompt | 临时文件 + `-f` 参数 |
 | Skill 目录 | `~/.claude/skills/` | `~/.agents/skills/` 与 `~/.local/share/mimocode/compose/*/skills/` |
@@ -168,6 +179,8 @@ wechat-mimocode daemon logs     # 查看最近日志
 也可以通过环境变量 `WMC_DATA_DIR` 指定数据目录，通过 `WMC_MODEL` 指定默认模型。
 
 ## 安全提醒
+
+本项目通过微信官方 ClawBot API 接入微信，**无封号风险**。所有消息传输使用官方加密通道，安全可靠。
 
 本项目会把微信消息转发给本地 MiMoCode CLI，并允许 MiMoCode 在指定工作目录内处理任务。请只绑定你信任的微信账号，避免把工作目录设置到敏感路径，并谨慎使用 `/send` 发送本地文件。
 
