@@ -3,44 +3,23 @@ import { homedir } from 'node:os';
 import { resolve } from 'node:path';
 import { WeChatApi } from './api.js';
 import { MessageItemType, MessageType, MessageState, TypingStatus, type MessageItem, type OutboundMessage } from './types.js';
-import { uploadFile, type UploadedMedia } from './upload.js';
+import { uploadFile } from './upload.js';
 import { logger } from '../logger.js';
 
 const TYPING_KEEPALIVE_MS = 5_000;
-const TICKET_TTL_MS = 24 * 60 * 60 * 1000;
-
-interface TypingTicketCache {
-  ticket: string;
-  fetchedAt: number;
-}
-
-function formatError(err: unknown): string {
-  return err instanceof Error ? err.message : String(err);
-}
 
 export function createSender(api: WeChatApi, botAccountId: string) {
   let clientCounter = 0;
-  const typingTicketCache = new Map<string, TypingTicketCache>();
+  const typingTicketCache = new Map<string, { ticket: string; fetchedAt: number }>();
+  const TICKET_TTL = 24 * 60 * 60 * 1000;
 
   function generateClientId(): string {
     return `wcc-${Date.now()}-${++clientCounter}`;
   }
 
-  function buildMessage(toUserId: string, contextToken: string, items: MessageItem[]): OutboundMessage {
-    return {
-      from_user_id: botAccountId,
-      to_user_id: toUserId,
-      client_id: generateClientId(),
-      message_type: MessageType.BOT,
-      message_state: MessageState.FINISH,
-      context_token: contextToken,
-      item_list: items,
-    };
-  }
-
   async function getTypingTicket(userId: string, contextToken?: string): Promise<string> {
     const cached = typingTicketCache.get(userId);
-    if (cached && Date.now() - cached.fetchedAt < TICKET_TTL_MS) {
+    if (cached && Date.now() - cached.fetchedAt < TICKET_TTL) {
       return cached.ticket;
     }
     try {
@@ -51,19 +30,15 @@ export function createSender(api: WeChatApi, botAccountId: string) {
       }
       logger.warn('getConfig returned no typing_ticket', { ret: resp.ret });
     } catch (err) {
-      logger.warn('getConfig failed', { err: formatError(err) });
+      logger.warn('getConfig failed', { err: err instanceof Error ? err.message : String(err) });
     }
     return '';
   }
 
-  function sendTypingStatus(toUserId: string, ticket: string, status: number): Promise<void> {
-    return api.sendTyping({
-      ilink_user_id: toUserId,
-      typing_ticket: ticket,
-      status,
-    });
-  }
-
+  /**
+   * Start typing indicator with keepalive. Returns a stop function.
+   * Fire-and-forget: errors are logged but not thrown.
+   */
   function startTyping(toUserId: string, contextToken: string): () => void {
     let cancelled = false;
 
@@ -72,26 +47,41 @@ export function createSender(api: WeChatApi, botAccountId: string) {
       if (!ticket || cancelled) return;
 
       try {
-        await sendTypingStatus(toUserId, ticket, TypingStatus.TYPING);
+        await api.sendTyping({
+          ilink_user_id: toUserId,
+          typing_ticket: ticket,
+          status: TypingStatus.TYPING,
+        });
       } catch (err) {
-        logger.debug('sendTyping start failed', { err: formatError(err) });
+        logger.debug('sendTyping start failed', { err: err instanceof Error ? err.message : String(err) });
         return;
       }
 
+      // Keepalive loop
       while (!cancelled) {
         await new Promise(r => setTimeout(r, TYPING_KEEPALIVE_MS));
         if (cancelled) break;
         try {
-          await sendTypingStatus(toUserId, ticket, TypingStatus.TYPING);
+          await api.sendTyping({
+            ilink_user_id: toUserId,
+            typing_ticket: ticket,
+            status: TypingStatus.TYPING,
+          });
         } catch {
           break;
         }
       }
 
+      // Send CANCEL to tell WeChat we're done typing
+      if (!ticket) return;
       try {
-        await sendTypingStatus(toUserId, ticket, TypingStatus.CANCEL);
+        await api.sendTyping({
+          ilink_user_id: toUserId,
+          typing_ticket: ticket,
+          status: TypingStatus.CANCEL,
+        });
       } catch {
-        // best-effort cancel
+        // ignore
       }
     })();
 
@@ -101,29 +91,28 @@ export function createSender(api: WeChatApi, botAccountId: string) {
   }
 
   async function sendText(toUserId: string, contextToken: string, text: string): Promise<void> {
-    const items: MessageItem[] = [{ type: MessageItemType.TEXT, text_item: { text } }];
-    const msg = buildMessage(toUserId, contextToken, items);
+    const clientId = generateClientId();
 
-    logger.info('Sending text message', { toUserId, clientId: msg.client_id, textLength: text.length });
+    const items: MessageItem[] = [
+      {
+        type: MessageItemType.TEXT,
+        text_item: { text },
+      },
+    ];
+
+    const msg: OutboundMessage = {
+      from_user_id: botAccountId,
+      to_user_id: toUserId,
+      client_id: clientId,
+      message_type: MessageType.BOT,
+      message_state: MessageState.FINISH,
+      context_token: contextToken,
+      item_list: items,
+    };
+
+    logger.info('Sending text message', { toUserId, clientId, textLength: text.length });
     await api.sendMessage({ msg });
-    logger.info('Text message sent', { toUserId, clientId: msg.client_id });
-  }
-
-  function buildFileItem(media: UploadedMedia): MessageItem {
-    const aesKeyBase64 = Buffer.from(media.aesKeyHex).toString('base64');
-    const mediaObj = {
-      encrypt_query_param: media.encryptQueryParam,
-      aes_key: aesKeyBase64,
-      encrypt_type: 1,
-    };
-
-    if (media.mediaType === 'image') {
-      return { type: MessageItemType.IMAGE, image_item: { media: mediaObj, mid_size: media.fileSize } };
-    }
-    return {
-      type: MessageItemType.FILE,
-      file_item: { media: mediaObj, file_name: media.fileName, len: String(media.rawSize) },
-    };
+    logger.info('Text message sent', { toUserId, clientId });
   }
 
   async function sendFile(toUserId: string, contextToken: string, filePath: string): Promise<void> {
@@ -135,17 +124,58 @@ export function createSender(api: WeChatApi, botAccountId: string) {
 
     try {
       const media = await uploadFile(api, toUserId, resolved);
-      const item = buildFileItem(media);
-      const msg = buildMessage(toUserId, contextToken, [item]);
+      const clientId = generateClientId();
 
-      logger.info('Sending file message', { toUserId, clientId: msg.client_id, fileName: media.fileName, mediaType: media.mediaType });
+      // Convert aesKeyHex to base64: treat hex string as UTF-8, then base64 encode
+      // (matches OpenClaw's format: Buffer.from(hexString).toString("base64"))
+      const aesKeyBase64 = Buffer.from(media.aesKeyHex).toString('base64');
+
+      let item: MessageItem;
+      if (media.mediaType === 'image') {
+        item = {
+          type: MessageItemType.IMAGE,
+          image_item: {
+            media: {
+              encrypt_query_param: media.encryptQueryParam,
+              aes_key: aesKeyBase64,
+              encrypt_type: 1,
+            },
+            mid_size: media.fileSize,
+          },
+        };
+      } else {
+        item = {
+          type: MessageItemType.FILE,
+          file_item: {
+            media: {
+              encrypt_query_param: media.encryptQueryParam,
+              aes_key: aesKeyBase64,
+              encrypt_type: 1,
+            },
+            file_name: media.fileName,
+            len: String(media.rawSize),
+          },
+        };
+      }
+
+      const msg: OutboundMessage = {
+        from_user_id: botAccountId,
+        to_user_id: toUserId,
+        client_id: clientId,
+        message_type: MessageType.BOT,
+        message_state: MessageState.FINISH,
+        context_token: contextToken,
+        item_list: [item],
+      };
+
+      logger.info('Sending file message', { toUserId, clientId, fileName: media.fileName, mediaType: media.mediaType });
       await api.sendMessage({ msg });
-      logger.info('File message sent', { toUserId, clientId: msg.client_id, fileName: media.fileName });
+      logger.info('File message sent', { toUserId, clientId, fileName: media.fileName });
     } catch (err) {
-      const errMsg = formatError(err);
-      logger.error('Failed to send file', { filePath: resolved, error: errMsg });
-      if (!errMsg.includes('rate-limited')) {
-        await sendText(toUserId, contextToken, `发送文件失败: ${errMsg}`);
+      const msg = err instanceof Error ? err.message : String(err);
+      logger.error('Failed to send file', { filePath: resolved, error: msg });
+      if (!msg.includes('rate-limited')) {
+        await sendText(toUserId, contextToken, `发送文件失败: ${msg}`);
       }
       throw err;
     }

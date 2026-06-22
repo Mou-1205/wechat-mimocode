@@ -1,16 +1,13 @@
 import { WeChatApi } from './api.js';
 import { loadSyncBuf, saveSyncBuf } from './sync-buf.js';
 import { logger } from '../logger.js';
-import type { WeixinMessage, GetUpdatesResp } from './types.js';
+import type { WeixinMessage } from './types.js';
 
 const SESSION_EXPIRED_ERRCODE = -14;
-const SESSION_EXPIRED_PAUSE_MS = 60 * 60 * 1000;
-const MAX_RECENT_IDS = 1000;
-const EVICT_TO = 500;
-
-const BACKOFF_BASE_MS = 3_000;
-const BACKOFF_MAX_MS = 60_000;
-const BACKOFF_ESCALATE_AFTER = 3;
+const SESSION_EXPIRED_PAUSE_MS = 60 * 60 * 1000; // 1 hour
+const BACKOFF_THRESHOLD = 3;
+const BACKOFF_LONG_MS = 30_000;
+const BACKOFF_SHORT_MS = 3_000;
 
 export interface MonitorCallbacks {
   onMessage: (msg: WeixinMessage) => Promise<void>;
@@ -19,100 +16,86 @@ export interface MonitorCallbacks {
 
 export function createMonitor(api: WeChatApi, callbacks: MonitorCallbacks) {
   const controller = new AbortController();
-  const recentIds = new Set<number>();
+  let stopped = false;
+  const recentMsgIds = new Set<number>();
+  const MAX_MSG_IDS = 1000;
 
   async function run(): Promise<void> {
-    let failures = 0;
+    let consecutiveFailures = 0;
 
     while (!controller.signal.aborted) {
       try {
-        const resp = await pollOnce();
-        failures = 0;
-        if (resp) processMessages(resp);
+        const buf = loadSyncBuf();
+        logger.debug('Polling for messages', { hasBuf: buf.length > 0 });
+
+        const resp = await api.getUpdates(buf || undefined);
+
+        if (resp.ret === SESSION_EXPIRED_ERRCODE) {
+          logger.warn('Session expired, pausing for 1 hour');
+          callbacks.onSessionExpired();
+          await sleep(SESSION_EXPIRED_PAUSE_MS, controller.signal);
+          consecutiveFailures = 0;
+          continue;
+        }
+
+        if (resp.ret !== undefined && resp.ret !== 0) {
+          logger.warn('getUpdates returned error', { ret: resp.ret, retmsg: resp.retmsg });
+        }
+
+        // Save the new sync buffer regardless of ret
+        if (resp.get_updates_buf) {
+          saveSyncBuf(resp.get_updates_buf);
+        }
+
+        // Process messages (with deduplication)
+        const messages = resp.msgs ?? [];
+        if (messages.length > 0) {
+          logger.info('Received messages', { count: messages.length });
+          for (const msg of messages) {
+            // Skip already-processed messages
+            if (msg.message_id && recentMsgIds.has(msg.message_id)) {
+              continue;
+            }
+            if (msg.message_id) {
+              recentMsgIds.add(msg.message_id);
+              if (recentMsgIds.size > MAX_MSG_IDS) {
+                // Evict oldest half (Set iterates in insertion order)
+                const iter = recentMsgIds.values();
+                const toDelete: number[] = [];
+                for (let i = 0; i < MAX_MSG_IDS / 2; i++) {
+                  const { value } = iter.next();
+                  if (value !== undefined) toDelete.push(value);
+                }
+                for (const id of toDelete) recentMsgIds.delete(id);
+              }
+            }
+            // Fire-and-forget: don't block the polling loop on message processing
+            // This allows permission responses (y/n) to be received while a query is running
+            callbacks.onMessage(msg).catch((err) => {
+              const msg2 = err instanceof Error ? err.message : String(err);
+              logger.error('Error processing message', { error: msg2, messageId: msg.message_id });
+            });
+          }
+        }
+
+        consecutiveFailures = 0;
       } catch (err) {
-        if (controller.signal.aborted) break;
-        failures++;
-        logger.error('Monitor error', {
-          error: errorMessage(err),
-          consecutiveFailures: failures,
-        });
-        await backoffSleep(failures);
+        if (controller.signal.aborted) {
+          break;
+        }
+
+        consecutiveFailures++;
+        const errorMsg = err instanceof Error ? err.message : String(err);
+        logger.error('Monitor error', { error: errorMsg, consecutiveFailures });
+
+        const backoff = consecutiveFailures >= BACKOFF_THRESHOLD ? BACKOFF_LONG_MS : BACKOFF_SHORT_MS;
+        logger.info(`Backing off ${backoff}ms`, { consecutiveFailures });
+        await sleep(backoff, controller.signal);
       }
     }
 
+    stopped = true;
     logger.info('Monitor stopped');
-  }
-
-  async function pollOnce(): Promise<GetUpdatesResp | null> {
-    const buf = loadSyncBuf();
-    logger.debug('Polling for messages', { hasBuf: buf.length > 0 });
-
-    const resp = await api.getUpdates(buf || undefined);
-
-    if (resp.get_updates_buf) {
-      saveSyncBuf(resp.get_updates_buf);
-    }
-
-    if (resp.ret === SESSION_EXPIRED_ERRCODE) {
-      logger.warn('Session expired, pausing for 1 hour');
-      callbacks.onSessionExpired();
-      await sleep(SESSION_EXPIRED_PAUSE_MS, controller.signal);
-      return null;
-    }
-
-    if (resp.ret !== undefined && resp.ret !== 0) {
-      logger.warn('getUpdates returned error', { ret: resp.ret, retmsg: resp.retmsg });
-    }
-
-    return resp;
-  }
-
-  function processMessages(resp: GetUpdatesResp): void {
-    const messages = resp.msgs;
-    if (!messages?.length) return;
-
-    logger.info('Received messages', { count: messages.length });
-
-    for (const msg of messages) {
-      if (isDuplicate(msg.message_id)) continue;
-      callbacks.onMessage(msg).catch((err) => {
-        logger.error('Error processing message', {
-          error: errorMessage(err),
-          messageId: msg.message_id,
-        });
-      });
-    }
-  }
-
-  function isDuplicate(id: number | undefined): boolean {
-    if (id === undefined) return false;
-    if (recentIds.has(id)) return true;
-
-    recentIds.add(id);
-    if (recentIds.size > MAX_RECENT_IDS) evictOldIds();
-    return false;
-  }
-
-  function evictOldIds(): void {
-    const iter = recentIds.values();
-    let removed = 0;
-    const target = MAX_RECENT_IDS - EVICT_TO;
-    while (removed < target) {
-      const { value, done } = iter.next();
-      if (done) break;
-      recentIds.delete(value);
-      removed++;
-    }
-  }
-
-  async function backoffSleep(failures: number): Promise<void> {
-    const exponent = Math.min(failures, 8);
-    const base = failures >= BACKOFF_ESCALATE_AFTER
-      ? BACKOFF_BASE_MS * Math.pow(2, exponent - BACKOFF_ESCALATE_AFTER + 1)
-      : BACKOFF_BASE_MS;
-    const ms = Math.min(base, BACKOFF_MAX_MS) + Math.random() * 1000;
-    logger.info(`Backing off ${Math.round(ms)}ms`, { consecutiveFailures: failures });
-    await sleep(ms, controller.signal);
   }
 
   function stop(): void {
@@ -125,13 +108,12 @@ export function createMonitor(api: WeChatApi, callbacks: MonitorCallbacks) {
   return { run, stop };
 }
 
-function errorMessage(err: unknown): string {
-  return err instanceof Error ? err.message : String(err);
-}
-
 function sleep(ms: number, signal?: AbortSignal): Promise<void> {
   return new Promise<void>((resolve) => {
-    if (signal?.aborted) { resolve(); return; }
+    if (signal?.aborted) {
+      resolve();
+      return;
+    }
 
     const timer = setTimeout(resolve, ms);
     signal?.addEventListener('abort', () => {

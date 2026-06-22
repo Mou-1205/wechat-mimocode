@@ -3,67 +3,9 @@ import { join } from "node:path";
 import { homedir } from "node:os";
 
 const LOG_DIR = join(process.env.XDG_CACHE_HOME || join(homedir(), ".cache"), "wechat-mimocode", "logs");
-const MAX_LOG_FILES = 30;
+const MAX_LOG_FILES = 30; // Keep at most 30 days of logs
 
-// ─── Log Level ───────────────────────────────────────────────────────────────
-
-const LEVELS = { DEBUG: 0, INFO: 1, WARN: 2, ERROR: 3 } as const;
-type Level = keyof typeof LEVELS;
-
-let minLevel: Level = (process.env.LOG_LEVEL?.toUpperCase() as Level) ?? "INFO";
-
-export function setLogLevel(level: Level): void {
-  minLevel = level;
-}
-
-function shouldLog(level: Level): boolean {
-  return LEVELS[level] >= LEVELS[minLevel];
-}
-
-// ─── Redaction ───────────────────────────────────────────────────────────────
-
-const SENSITIVE_KEY_RE =
-  /(?:(?:[\w]+_)?[Tt]oken|(?:[\w]+_)?[Ss]ecret|(?:[\w]+_)?[Pp]assword|(?:[\w]+_)?[Kk]ey|(?:[\w]+_)?[Cc]ookie|(?:[\w]+_)?[Cc]redential|(?:[\w]+_)?[Aa]uthorization|(?:[\w]+_)?api_?key)/i;
-
-const PATTERNS: [RegExp, string][] = [
-  [/Bearer\s+[^\s"\\]+/gi, "Bearer ***"],
-  [/\b\d{11,13}\b/g, "***phone***"],
-  [/\b[\w.+-]+@[\w-]+\.[\w.-]+\b/gi, "***email***"],
-  [/sk-[A-Za-z0-9]{8,}/g, "sk-***"],
-];
-
-function redactString(s: string): string {
-  let out = s;
-  for (const [re, replacement] of PATTERNS) {
-    out = out.replace(re, replacement);
-  }
-  return out;
-}
-
-function redactValue(value: unknown, depth: number): unknown {
-  if (depth > 8) return "***";
-  if (value === null || value === undefined) return value;
-  if (typeof value === "string") return redactString(value);
-  if (typeof value === "number" || typeof value === "boolean") return value;
-  if (Array.isArray(value)) return value.map((v) => redactValue(v, depth + 1));
-  if (typeof value === "object") {
-    const out: Record<string, unknown> = {};
-    for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
-      out[k] = SENSITIVE_KEY_RE.test(k) ? "***" : redactValue(v, depth + 1);
-    }
-    return out;
-  }
-  return value;
-}
-
-/** Redact sensitive data from any value. Returns a JSON string. */
-export function redact(obj: unknown): string {
-  if (obj === null || obj === undefined) return String(obj);
-  return JSON.stringify(redactValue(obj, 0));
-}
-
-// ─── File helpers ────────────────────────────────────────────────────────────
-
+/** Clean up old log files beyond MAX_LOG_FILES retention. */
 function cleanupOldLogs(): void {
   try {
     const files = readdirSync(LOG_DIR)
@@ -73,8 +15,33 @@ function cleanupOldLogs(): void {
       unlinkSync(join(LOG_DIR, files.shift()!));
     }
   } catch {
-    // directory may not exist yet
+    // Ignore errors during cleanup
   }
+}
+
+/**
+ * Redact sensitive values from a string:
+ * - Bearer tokens (Authorization headers)
+ * - aes_key values
+ * - generic token/secret values in JSON payloads
+ */
+export function redact(obj: unknown): string {
+  const raw = typeof obj === "string" ? obj : JSON.stringify(obj);
+  if (!raw) return raw;
+
+  let safe = raw;
+  // Mask Bearer tokens: "Bearer <anything>"
+  safe = safe.replace(/Bearer\s+[^\s"\\]+/gi, "Bearer ***");
+  // Mask generic token/secret/password/api_key values in JSON
+  // Matches both snake_case (bot_token) and camelCase (botToken)
+  safe = safe.replace(
+    /"(?:(?:[\w]+_)?[Tt]oken|(?:[\w]+_)?[Ss]ecret|(?:[\w]+_)?[Pp]assword|(?:[\w]+_)?api_key|[Aa]es_[Kk]ey)"\s*:\s*"[^"]*"/gi,
+    (match) => {
+      const key = match.match(/"[^"]*"/)?.[0] ?? '""';
+      return `${key}: "***"`;
+    },
+  );
+  return safe;
 }
 
 function ensureLogDir(): void {
@@ -83,67 +50,42 @@ function ensureLogDir(): void {
 }
 
 function getLogFilePath(): string {
-  const date = new Date().toISOString().slice(0, 10);
+  const now = new Date();
+  const date = now.toISOString().slice(0, 10); // YYYY-MM-DD
   return join(LOG_DIR, `bridge-${date}.log`);
 }
 
 function localTimestamp(): string {
   const d = new Date();
   const offset = -d.getTimezoneOffset();
-  const sign = offset >= 0 ? "+" : "-";
-  const hh = String(Math.floor(Math.abs(offset) / 60)).padStart(2, "0");
-  const mm = String(Math.abs(offset) % 60).padStart(2, "0");
-  return d.toISOString().replace("Z", `${sign}${hh}:${mm}`);
+  const sign = offset >= 0 ? '+' : '-';
+  const hh = String(Math.floor(Math.abs(offset) / 60)).padStart(2, '0');
+  const mm = String(Math.abs(offset) % 60).padStart(2, '0');
+  return d.toISOString().replace('Z', `${sign}${hh}:${mm}`);
 }
 
-// ─── Structured log line ─────────────────────────────────────────────────────
-
-interface LogEntry {
-  ts: string;
-  level: Level;
-  msg: string;
-  ctx?: Record<string, unknown>;
-}
-
-function writeLogLine(
-  level: Level,
-  message: string,
-  contextOrData?: unknown,
-): void {
-  if (!shouldLog(level)) return;
+function writeLogLine(level: string, message: string, data?: unknown): void {
   ensureLogDir();
-
-  const entry: LogEntry = { ts: localTimestamp(), level, msg: message };
-
-  if (contextOrData !== undefined) {
-    if (
-      typeof contextOrData === "object" &&
-      contextOrData !== null &&
-      !Array.isArray(contextOrData)
-    ) {
-      entry.ctx = redactValue(contextOrData, 0) as Record<string, unknown>;
-    } else {
-      entry.ctx = { data: redactValue(contextOrData, 0) };
-    }
+  const timestamp = localTimestamp();
+  const parts = [timestamp, level, message];
+  if (data !== undefined) {
+    parts.push(redact(data));
   }
-
-  const line = JSON.stringify(entry) + "\n";
+  const line = parts.join(" ") + "\n";
   appendFileSync(getLogFilePath(), line, "utf-8");
 }
 
-// ─── Public API ──────────────────────────────────────────────────────────────
-
 export const logger = {
-  info(message: string, contextOrData?: unknown): void {
-    writeLogLine("INFO", message, contextOrData);
+  info(message: string, data?: unknown): void {
+    writeLogLine("INFO", message, data);
   },
-  warn(message: string, contextOrData?: unknown): void {
-    writeLogLine("WARN", message, contextOrData);
+  warn(message: string, data?: unknown): void {
+    writeLogLine("WARN", message, data);
   },
-  error(message: string, contextOrData?: unknown): void {
-    writeLogLine("ERROR", message, contextOrData);
+  error(message: string, data?: unknown): void {
+    writeLogLine("ERROR", message, data);
   },
-  debug(message: string, contextOrData?: unknown): void {
-    writeLogLine("DEBUG", message, contextOrData);
+  debug(message: string, data?: unknown): void {
+    writeLogLine("DEBUG", message, data);
   },
 } as const;

@@ -11,8 +11,10 @@
 
 import { readFileSync, readdirSync, existsSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { homedir } from 'node:os';
 import { execSync } from 'node:child_process';
-import { DATA_DIR } from '../constants.js';
+
+const DATA_DIR = process.env.WMC_DATA_DIR || join(homedir(), '.wechat-mimocode');
 
 // ─── Keepalive messages (must match main.ts SILENCE_MESSAGES) ───
 const SILENCE_MESSAGES = new Set([

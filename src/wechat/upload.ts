@@ -2,7 +2,6 @@ import { createHash, randomBytes } from 'node:crypto';
 import { readFileSync, statSync } from 'node:fs';
 import { basename, extname } from 'node:path';
 import { encryptAesEcb, aesEcbPaddedSize } from './crypto.js';
-import { fetchWithTimeout } from './cdn.js';
 import { WeChatApi } from './api.js';
 import { UploadMediaType } from './types.js';
 import { CDN_BASE_URL } from '../constants.js';
@@ -39,14 +38,16 @@ export async function uploadFile(
   const isImage = isImageFile(filePath);
   const mediaType = isImage ? UploadMediaType.IMAGE : UploadMediaType.FILE;
 
+  // Prepare file
   const plaintext = readFileSync(filePath);
   const rawSize = plaintext.length;
   const rawFileMd5 = createHash('md5').update(plaintext).digest('hex');
   const fileSize = aesEcbPaddedSize(rawSize);
-  const fileKey = randomBytes(16).toString('hex');
-  const aesKey = randomBytes(16);
+  const fileKey = randomBytes(16).toString('hex'); // 32-hex-char string
+  const aesKey = randomBytes(16); // 16 raw bytes
   const aesKeyHex = aesKey.toString('hex');
 
+  // Get upload URL
   logger.info('Requesting upload URL', { fileName, rawSize, mediaType, toUserId });
 
   const uploadResp = await api.getUploadUrl({
@@ -70,32 +71,21 @@ export async function uploadFile(
     throw new Error(`获取上传地址失败: ${JSON.stringify(uploadResp)}`);
   }
 
+  // Encrypt
   const encrypted = encryptAesEcb(aesKey, plaintext);
 
-  const uploadUrl = uploadResp.upload_full_url
-    ?? `${CDN_BASE_URL}/upload?encrypted_query_param=${encodeURIComponent(uploadResp.upload_param!)}&filekey=${fileKey}`;
+  // Build CDN upload URL
+  let uploadUrl: string;
+  if (uploadResp.upload_full_url) {
+    uploadUrl = uploadResp.upload_full_url;
+  } else {
+    uploadUrl = `${CDN_BASE_URL}/upload?encrypted_query_param=${encodeURIComponent(uploadResp.upload_param!)}&filekey=${fileKey}`;
+  }
 
   logger.info('Uploading to CDN', { uploadUrl, encryptedSize: encrypted.length });
 
-  const res = await fetchWithTimeout(
-    uploadUrl,
-    {
-      method: 'POST',
-      body: new Uint8Array(encrypted),
-      headers: { 'Content-Type': 'application/octet-stream' },
-    },
-    { timeoutMs: 60_000, retries: 3 },
-  );
-
-  if (res.status >= 400) {
-    const text = await res.text();
-    throw new Error(`CDN 上传失败 (${res.status}): ${text.slice(0, 200)}`);
-  }
-
-  const encryptQueryParam = res.headers.get('x-encrypted-param');
-  if (!encryptQueryParam) {
-    throw new Error('CDN 上传成功但未返回 x-encrypted-param');
-  }
+  // Upload to CDN (POST, get download param from response header)
+  const encryptQueryParam = await uploadToCdn(uploadUrl, encrypted);
 
   logger.info('CDN upload succeeded', { fileName });
 
@@ -107,4 +97,48 @@ export async function uploadFile(
     fileSize,
     rawSize,
   };
+}
+
+async function uploadToCdn(url: string, encrypted: Buffer): Promise<string> {
+  const MAX_RETRIES = 3;
+
+  for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 60_000);
+
+    try {
+      const res = await fetch(url, {
+        method: 'POST',
+        body: new Uint8Array(encrypted),
+        signal: controller.signal,
+        headers: { 'Content-Type': 'application/octet-stream' },
+      });
+
+      if (res.status >= 400 && res.status < 500) {
+        const text = await res.text();
+        throw new Error(`CDN 上传失败 (4xx): ${res.status} ${text.slice(0, 200)}`);
+      }
+
+      if (res.status >= 500) {
+        logger.warn('CDN upload 5xx, retrying', { status: res.status, attempt });
+        continue;
+      }
+
+      // Get download param from response header
+      const param = res.headers.get('x-encrypted-param');
+      if (!param) {
+        throw new Error('CDN 上传成功但未返回 x-encrypted-param');
+      }
+      return param;
+    } catch (err) {
+      if (err instanceof DOMException && err.name === 'AbortError') {
+        throw new Error('CDN 上传超时');
+      }
+      throw err;
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
+  throw new Error('CDN 上传失败: 多次重试后仍失败');
 }

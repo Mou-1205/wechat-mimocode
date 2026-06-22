@@ -1,7 +1,7 @@
 import path from 'node:path';
 import os from 'node:os';
 import fs from 'node:fs';
-import type { MessageItem, ImageItem, FileItem } from './types.js';
+import type { MessageItem, ImageItem } from './types.js';
 import { MessageItemType } from './types.js';
 import { downloadAndDecrypt } from './cdn.js';
 import { logger } from '../logger.js';
@@ -12,53 +12,64 @@ function detectMimeType(data: Buffer): string {
   if (data[0] === 0x47 && data[1] === 0x49) return 'image/gif';
   if (data[0] === 0x52 && data[1] === 0x49) return 'image/webp';
   if (data[0] === 0x42 && data[1] === 0x4D) return 'image/bmp';
-  return 'image/jpeg';
+  return 'image/jpeg'; // fallback
 }
 
-interface CdnData {
-  aesKey: string;
-  encryptQueryParam: string;
-}
-
-function extractCdnData(item: ImageItem | FileItem): CdnData | null {
-  const cdnMedia = item.cdn_media;
-  const media = item.media;
-
-  // Prefer cdn_media (older API format)
-  if (cdnMedia?.aes_key && cdnMedia?.encrypt_query_param) {
-    return { aesKey: cdnMedia.aes_key, encryptQueryParam: cdnMedia.encrypt_query_param };
+/**
+ * Extract AES key and encrypt_query_param from an ImageItem,
+ * supporting both the old cdn_media format and the newer flat format.
+ */
+function getImageCdnData(imageItem: ImageItem): { aesKey: string; encryptQueryParam: string } | null {
+  // Old format: cdn_media.aes_key + cdn_media.encrypt_query_param
+  if (imageItem.cdn_media?.aes_key && imageItem.cdn_media?.encrypt_query_param) {
+    return {
+      aesKey: imageItem.cdn_media.aes_key,
+      encryptQueryParam: imageItem.cdn_media.encrypt_query_param,
+    };
   }
 
-  // Fall back to media (newer API format)
-  if (media?.encrypt_query_param) {
-    const aesKey = media.aes_key ?? ('aeskey' in item ? (item as ImageItem).aeskey : undefined);
-    if (aesKey) {
-      return { aesKey, encryptQueryParam: media.encrypt_query_param };
-    }
+  // New format: aeskey + media.encrypt_query_param
+  // Use media.aes_key (base64-of-hex) over aeskey (raw hex) since downloadAndDecrypt expects base64
+  if (imageItem.media?.encrypt_query_param && (imageItem.media.aes_key || imageItem.aeskey)) {
+    return {
+      aesKey: imageItem.media.aes_key ?? imageItem.aeskey!,
+      encryptQueryParam: imageItem.media.encrypt_query_param,
+    };
   }
 
-  logger.warn('Item has no usable CDN data', {
-    hasCdnMedia: !!cdnMedia,
-    hasMedia: !!media,
+  logger.warn('Image item has no usable CDN data', {
+    hasCdnMedia: !!imageItem.cdn_media,
+    hasAeskey: !!imageItem.aeskey,
+    hasMedia: !!imageItem.media,
   });
   return null;
 }
 
+/**
+ * Download a CDN image, decrypt it, and return a base64 data URI.
+ * Returns null on failure.
+ */
 export async function downloadImage(item: MessageItem): Promise<string | null> {
   const imageItem = item.image_item;
-  if (!imageItem) return null;
+  if (!imageItem) {
+    return null;
+  }
 
-  const cdnData = extractCdnData(imageItem);
-  if (!cdnData) return null;
+  const cdnData = getImageCdnData(imageItem);
+  if (!cdnData) {
+    return null;
+  }
 
   try {
     const decrypted = await downloadAndDecrypt(cdnData.encryptQueryParam, cdnData.aesKey);
     const mimeType = detectMimeType(decrypted);
-    const dataUri = `data:${mimeType};base64,${decrypted.toString('base64')}`;
+    const base64 = decrypted.toString('base64');
+    const dataUri = `data:${mimeType};base64,${base64}`;
     logger.info('Image downloaded and decrypted', { size: decrypted.length });
     return dataUri;
   } catch (err) {
-    logger.warn('Failed to download image', { error: err instanceof Error ? err.message : String(err) });
+    const msg = err instanceof Error ? err.message : String(err);
+    logger.warn('Failed to download image', { error: msg });
     return null;
   }
 }
@@ -71,23 +82,46 @@ export function extractText(item: MessageItem): string {
   return '';
 }
 
+/**
+ * Find the first IMAGE type item in a list.
+ */
 export function extractFirstImageUrl(items?: MessageItem[]): MessageItem | undefined {
   return items?.find((item) => item.type === MessageItemType.IMAGE);
 }
 
+/**
+ * Find the first FILE type item in a list.
+ */
 export function extractFirstFileItem(items?: MessageItem[]): MessageItem | undefined {
   return items?.find((item) => item.type === MessageItemType.FILE);
 }
 
+/**
+ * Download a CDN file, decrypt it, and save to a temp directory.
+ * Returns the local file path, or null on failure.
+ */
 export async function downloadFile(item: MessageItem): Promise<string | null> {
   const fileItem = item.file_item;
   if (!fileItem) return null;
 
-  const cdnData = extractCdnData(fileItem);
-  if (!cdnData) return null;
+  let aesKey: string | undefined;
+  let encryptQueryParam: string | undefined;
+
+  if (fileItem.media?.encrypt_query_param) {
+    encryptQueryParam = fileItem.media.encrypt_query_param;
+    aesKey = fileItem.media.aes_key;
+  } else if (fileItem.cdn_media?.encrypt_query_param) {
+    encryptQueryParam = fileItem.cdn_media.encrypt_query_param;
+    aesKey = fileItem.cdn_media.aes_key;
+  }
+
+  if (!encryptQueryParam || !aesKey) {
+    logger.warn('File item has no usable CDN data');
+    return null;
+  }
 
   try {
-    const decrypted = await downloadAndDecrypt(cdnData.encryptQueryParam, cdnData.aesKey);
+    const decrypted = await downloadAndDecrypt(encryptQueryParam, aesKey);
     const tmpDir = path.join(os.tmpdir(), 'wechat-mimocode');
     fs.mkdirSync(tmpDir, { recursive: true });
     const fileName = fileItem.file_name || `file-${Date.now()}.bin`;
@@ -96,7 +130,8 @@ export async function downloadFile(item: MessageItem): Promise<string | null> {
     logger.info('File downloaded and saved', { path: filePath, size: decrypted.length, name: fileName });
     return filePath;
   } catch (err) {
-    logger.warn('Failed to download file', { error: err instanceof Error ? err.message : String(err) });
+    const msg = err instanceof Error ? err.message : String(err);
+    logger.warn('Failed to download file', { error: msg });
     return null;
   }
 }

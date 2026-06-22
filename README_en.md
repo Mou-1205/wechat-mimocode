@@ -13,12 +13,10 @@
 
 A fork of [wechat-claude-code](https://github.com/Wechat-ggGitHub/wechat-claude-code) that replaces the Claude Code CLI with [MiMoCode](https://github.com/XiaomiMiMo/MiMo-Code) CLI. After binding WeChat with a QR code, a new "friend" appears in your contacts. Send it a message, and it is forwarded to MiMoCode running on your computer. Replies stream back to WeChat in real time. Supports text, images, voice, and files.
 
-## Core Advantages
+## Highlights
 
 | | |
 |---|---|
-| **Native WeChat Integration** | Connects through WeChat ClawBot (iLink Bot) official API, **no risk of account ban**. |
-| **No Third-party Services** | No external servers required. All data processed locally, secure and controllable. |
 | **Scan and go** | No server deployment required. Scan a QR code to bind WeChat, and credentials, sessions, and logs are stored locally by default. |
 | **MiMoCode-powered** | Uses local MiMoCode CLI for requests, with MiMoCode model, tool, and workspace support. |
 | **Native context compression** | Calls MiMoCode CLI's native `/compact` command, session ID remains unchanged, tokens reduced significantly. |
@@ -28,20 +26,6 @@ A fork of [wechat-claude-code](https://github.com/Wechat-ggGitHub/wechat-claude-
 | **Two-way files** | Send images, PDFs, and documents to MiMoCode for analysis; generated files can also be pushed back to WeChat. |
 | **Skills auto-translation** | `/skills full` shows installed Skills with descriptions automatically translated to Chinese. |
 | **Cross-platform daemon** | The daemon is implemented in TypeScript and supports Windows, macOS, and Linux. |
-
-## Why Choose Us?
-
-### 🔒 Safe & Reliable
-
-- **Native WeChat API**: Connects through WeChat official ClawBot (iLink Bot) interface, not third-party reverse-engineered protocols
-- **No Ban Risk**: Uses officially authorized Bot interface, won't trigger WeChat's risk control mechanisms
-- **Local Deployment**: All data stored on your computer, no third-party servers involved
-
-### 🚀 Simple & Easy
-
-- **Three-step Setup**: `install` → `setup` → `start`, no complex configuration needed
-- **QR Code Binding**: As simple as adding a friend
-- **Instant Response**: Real-time message delivery, smooth experience
 
 ## Install
 
@@ -152,25 +136,10 @@ Send these directly in the WeChat chat:
 ## How It Works
 
 ```text
-WeChat (phone) ←→ WeChat ClawBot API ←→ Node.js daemon ←→ MiMoCode CLI (local)
+WeChat (phone) ←→ ilink Bot API ←→ Node.js daemon ←→ MiMoCode CLI (local)
 ```
 
-### What is ClawBot?
-
-ClawBot is WeChat's official Bot interface (iLink Bot) that allows developers to create WeChat bots through official APIs. Unlike third-party reverse-engineered protocols, ClawBot is officially supported by WeChat:
-
-- ✅ **Official Authorization**: Recognized and supported by WeChat
-- ✅ **Stable & Reliable**: Won't break when WeChat updates
-- ✅ **No Ban Risk**: Uses official APIs, doesn't violate WeChat's terms of service
-- ✅ **Full Functionality**: Supports text, images, files, voice, and other message types
-
-### Message Flow
-
-1. User sends a message in WeChat
-2. WeChat ClawBot API receives the message and pushes it to the daemon
-3. Daemon forwards the message to local MiMoCode CLI for processing
-4. MiMoCode's response is pushed back to WeChat through the daemon
-5. User receives the response in WeChat
+The daemon long-polls WeChat for new messages, forwards them to the local MiMoCode CLI, and streams replies back to WeChat. Everything runs on your own computer.
 
 ## Differences from the Upstream
 
@@ -201,8 +170,6 @@ All data is stored in `~/.wechat-mimocode/` by default:
 You can also set `WMC_DATA_DIR` to change the data directory, and `WMC_MODEL` to override the default model.
 
 ## Safety Notes
-
-This project connects to WeChat through the official ClawBot API, **with no risk of account ban**. All message transmissions use WeChat's official encrypted channels, ensuring security and reliability.
 
 This project forwards WeChat messages to a local MiMoCode CLI and allows MiMoCode to process tasks within the configured working directory. Bind only a trusted WeChat account, avoid sensitive paths as the working directory, and use `/send` carefully when sharing local files.
 
